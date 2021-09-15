@@ -82,16 +82,8 @@ to your departmental AFS (Andrew File System) home directories.  For now, your
 home directories are located in the local hard disk.  These home directories
 will be razed once the semester is over.
 
-The upshot is that you will have to backup your files before the semester is
-over if you want to keep them.  You can use a file transfer client like
-[FileZilla](https://filezilla-project.org/download.php?type=client) to download
-them to your desktop.  Or, you can try to copy them to your AFS home directory,
-if you know your way around Linux.  Your AFS home directory is mounted at
-/afs/cs.pitt.edu/usr0/USERNAME (replace USERNAME with your Pitt ID).
-
-The first action item is to copy over the exercise source code to your local
-directory.  Create and go to a directory of your choice (or you can stay at
-your default home directory) and the clone your GitHub Classroom repository:
+Create and go to a directory of your choice (or you can stay at your default
+home directory) and then clone your GitHub Classroom repository:
 
 ```
 $ git clone <your GitHub Classroom repository HTTPS URL>
