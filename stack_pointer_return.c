@@ -3,6 +3,7 @@
 #include <string.h>
 
 void send_data(unsigned char *data, int len) {
+  printf("[Sent data]\n");
   for (int i=0; i < len; i++) {
     printf("%2x ", data[i]);
   }
