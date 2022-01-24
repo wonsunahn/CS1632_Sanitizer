@@ -15,11 +15,11 @@
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Fall Semester 2021 - Supplementary Exercise 1
+Spring Semester 2022 - Supplementary Exercise 1
 
-DUE: Sep 20 (Monday), 2021 9:30 AM
+DUE: Jan 28 (Friday), 2022 11:59 PM
 
-**GitHub Classroom Link:** https://classroom.github.com/g/8Yb655xL
+**GitHub Classroom Link:** TBD
 
 When you accept the assignment in GitHub Classroom, you will be asked to create
 a new Team, or choose an existing Team.  If you are the first group member to
@@ -82,23 +82,22 @@ to your departmental AFS (Andrew File System) home directories.  For now, your
 home directories are located in the local hard disk.  These home directories
 will be razed once the semester is over.
 
-The upshot is that you will have to backup your files before the semester is
-over if you want to keep them.  You can use a file transfer client like
-[FileZilla](https://filezilla-project.org/download.php?type=client) to download
-them to your desktop.  Or, you can try to copy them to your AFS home directory,
-if you know your way around Linux.  Your AFS home directory is mounted at
-/afs/cs.pitt.edu/usr0/USERNAME (replace USERNAME with your Pitt ID).
-
-The first action item is to copy over the exercise source code to your local
-directory.  Create and go to a directory of your choice (or you can stay at
-your default home directory) and do the following:
+Create and go to a directory of your choice (or you can stay at your default
+home directory) and then clone your GitHub Classroom repository:
 
 ```
-$ cp -R /home/PITT/wahn/nondeterminism ./
-$ cd nondeterminism/C
+$ git clone <your GitHub Classroom repository HTTPS URL>
 ```
 
-I have provided a Makefile build script to automate the build.  All you have to do is invoke 'make':
+This will ask for your Username and Password.  Username is your GitHub
+account username, but Password is not your password.  Password
+authentication on GitHub has been deprecated on August 2021, so now you have
+to use something called a Personal Authenication Token (PAT) in place of the
+password.  Here are instructions on how to create a PAT:
+https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token
+
+Now cd into your cloned directory.  I have provided a Makefile build script
+to automate the build.  All you have to do is invoke 'make':
 
 ```
 $ make
@@ -328,25 +327,36 @@ ASAN is able to pinpoint exactly where the illegal "READ of size 1" happened at
 stack_overflow.c:17!  That is where the out of bounds array access happens.
 Below that line is the stack trace so we know the calling context.
 
-stack_pointer_return.c is another buggy program with a common error where a
-function returns a pointer to a local array.  When the function returns, the
-local array is deallocated with the rest of the function frame as it is now out
-of scope, thereby leaving the pointer dangling.  It leads to a segmentation
-fault:
+stack_pointer_return.c is another buggy program with a common memory error
+where a function returns a pointer to a local array.  When the function
+returns, the local array is deallocated with the rest of the function frame
+as it is now out of scope, thereby leaving the pointer dangling.  Similar to
+the stack overflow memory error, accessing dangling pointers results in
+**undefined behavior** according to the C language specifications.  The
+particular version of GCC installed on the machine (GCC 9.3.0) chose to set
+this dangling pointer to a null pointer before returning from the function
+bar() rather than leaving it dangling (which is a good choice).  So, you get
+deterministic behavior in this case --- it's just that accessing a null
+pointer results in a segmentation fault:
 
 ```
 $ ./stack_pointer_return.bin
 Segmentation fault (core dumped)
-$ ./stack_pointer_return.bin
-Segmentation fault (core dumped)
-$ ./stack_pointer_return.bin
-Segmentation fault (core dumped)
 ```
 
-Let's see if ASAN is able to find this bug:
+Old versions of GCC and some other compilers would just leave the pointer
+dangling which would cause an access of a dangling pointer.  So what happens
+then?  Well, the pointer is dangling because the memory that it used to
+point to is deallocated.  That piece of memory eventually gets reallocated
+to hold other values (in this case, when a new stack frame is allocated).
+If that value is an address, you would get nondeterministic behavior.
+
+In any case, it is a memory error that needs to be fixed!  So let's see if
+ASAN can help us this time as well:
 
 ```
 $ ./stack_pointer_return.asan
+[Sent data]
 AddressSanitizer:DEADLYSIGNAL
 =================================================================
 ==2438240==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x561accf992c7 bp 0x7ffc3c7d7630 sp 0x7ffc3c7d7610 T0)
@@ -363,7 +373,7 @@ SUMMARY: AddressSanitizer: SEGV /home/PITT/wahn/nondeterminism/C/stack_pointer_r
 ```
 
 Again, stack_pointer_return.c:7 is flagged as an illegal read because it is
-attempting to read a location that has already been deallocated.
+attempting to read a location that has already been deallocated.  
 
 ### Debugging
 
@@ -398,7 +408,8 @@ $ ./stack_overflow.asan
 ```
 
 ```
-$ ./stack_pointer_return.asan 
+$ ./stack_pointer_return.asan
+[Sent data]
  1  2  3  4  5  6  7  8 
 ```
 
@@ -533,8 +544,49 @@ https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
 
 ## Submission
 
-Please submit your GitHub Classroom repository with the debugged
-stack_overflow.c, stack_pointer_return.c, and datarace.c to GradeScope to
+Once you got it working, it's time to commit your changes and push them to
+the GitHub.com origin repository.  Before you do that, let's clean up the
+repository such that you remove all generated binary files:
+
+```
+$ make clean
+```
+
+Once you do that, if you do 'git status' you should see only three modified
+files:
+
+```
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   datarace.c
+	modified:   stack_overflow.c
+	modified:   stack_pointer_return.c
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+Now, let's commit those files to your local repository (after adding the
+modifications using the -a option):
+
+```
+$ git commit -a
+```
+
+That will launch an editor where you can add comments.  After saving the
+comments, you will see the commit happening.  Now the only thing left to do
+is to push the changes to the origin:
+
+```
+$ git push
+```
+
+Feel free to double check that your changes have to been reflected on to
+your GitHub Classroom origin repository.  Please submit that repository to
 the "Supplementary Exercise 1 GitHub" link.
 
 Again, don't forget to add your partner to each submission.  You can
@@ -543,8 +595,8 @@ autograder.
 
 ## Division of Work
 
-For this exercise, I recommend that you both try to the full exercise.
-Compare your debugged files in the end and submit!
+For this exercise, I recommend that you both try to do the full exercise.
+Compare your debugged files in the end, discuss, and submit!
 
 ## Resources
 
