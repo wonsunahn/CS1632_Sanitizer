@@ -423,8 +423,7 @@ If you are stuck debugging the programs, here are some hints:
 1. stack_pointer_return.c is attempting to return a pointer to a stack
    location.  One way to fix it is to declare the array to be a static local
 variable so that it gets moved from the stack to static memory which has
-persistent duration.  If you still need more help, here is a decent tutorial:
-https://www.geeksforgeeks.org/return-local-array-c-function/
+persistent duration.  
 
 ### Comparing Google ASAN with Valgrind
 
@@ -539,8 +538,11 @@ shared=2000000
 Hint: you will have to use the pthreads mutex API to acquire and relase the
 lock while the update to the shared variable is happening.  Use the
 pthread_mutex_init, pthread_mutex_lock, and pthread_mutex_unlock APIs you
-learned in CS 449.  If you need more of a reminder, here is a short tutorial:
-https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
+learned in CS 449.  If you need a reminder, here is the pthread_mutex_init manpage:
+https://linux.die.net/man/3/pthread_mutex_init
+
+There is some example code at the bottom of the manpage.  For your uses, using
+the PTHREAD_MUTEX_INITIALIZER initializer should suffice.
 
 ## Submission
 
