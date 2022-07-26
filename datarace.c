@@ -1,15 +1,11 @@
 #include <stdio.h>
 #include <pthread.h>
 
-static pthread_mutex_t foo_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 int shared = 0;
 
 void *add(void *unused) {
   for(int i=0; i < 1000000; i++) { 
-    pthread_mutex_lock(&foo_mutex);
     shared++;
-    pthread_mutex_unlock(&foo_mutex);
   }
   return NULL;
 }
