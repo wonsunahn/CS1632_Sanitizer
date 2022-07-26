@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   }
 
   // Send contents of first.data to the screen
-  send_data(first.data, 16);
+  send_data(first.data, 8);
 
   return 0;
 }
