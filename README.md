@@ -1,32 +1,25 @@
 - [CS 1632 - Software Quality Assurance](#cs-1632---software-quality-assurance)
-  * [Description](#description)
-  * [Connecting to thoth.cs.pitt.edu](#connecting-to-thothcspittedu)
-  * [Building](#building)
-  * [Testing and Debugging Memory Errors](#testing-and-debugging-memory-errors)
-    + [Turning off ASLR (Address Space Layout Randomization)](#turning-off-aslr-address-space-layout-randomization)
-    + [Using Google ASAN (Address Sanitizer)](#using-google-asan-address-sanitizer)
-    + [Debugging](#debugging)
-    + [Comparing Google ASAN with Valgrind](#comparing-google-asan-with-valgrind)
-  * [Testing and Debugging Datarace Errors](#testing-and-debugging-datarace-errors)
-    + [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
-    + [Debugging](#debugging-1)
-  * [Submission](#submission)
-  * [Division of Work](#division-of-work)
-  * [Resources](#resources)
+  - [Description](#description)
+  - [Connecting to thoth.cs.pitt.edu](#connecting-to-thothcspittedu)
+  - [Building](#building)
+  - [Testing and Debugging Memory Errors](#testing-and-debugging-memory-errors)
+    - [Turning off ASLR (Address Space Layout Randomization)](#turning-off-aslr-address-space-layout-randomization)
+    - [Using Google ASAN (Address Sanitizer)](#using-google-asan-address-sanitizer)
+    - [Debugging](#debugging)
+    - [Comparing Google ASAN with Valgrind](#comparing-google-asan-with-valgrind)
+  - [Testing and Debugging Datarace Errors](#testing-and-debugging-datarace-errors)
+    - [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
+    - [Debugging](#debugging-1)
+  - [Submission](#submission)
+  - [Division of Work](#division-of-work)
+  - [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Spring Semester 2022 - Supplementary Exercise 1
+Fall Semester 2022 - Supplementary Exercise 3
 
-DUE: Jan 28 (Friday), 2022 11:59 PM
+DUE: October 28 (Friday), 2022 11:59 PM
 
-**GitHub Classroom Link:** https://classroom.github.com/a/X8oN2isF
-
-When you accept the assignment in GitHub Classroom, you will be asked to create
-a new Team, or choose an existing Team.  If you are the first group member to
-accept the assignment, please create a new Team.  Otherwise, please look for an
-existing Team that your partner has already created.  Please use the team name
-that you put on your **Partnership Contract**.  If you haven't yet decided on a
-name, choose any name your prefer --- just keep it classroom friendly.
+**GitHub Classroom Link:** TBD
 
 ## Description
 
