@@ -39,14 +39,14 @@ int main(int argc, char **argv) {
     printf("padding (8 bytes)\n");
     printf("third.next = %p\n", third.next);
     printf("third.data = %s\n", third.data);
-    printf("second.next = %p\n", second.next);
-    printf("second.data = %s\n", second.data);
+    printf("second.next = %p <--- Sent!\n", second.next);
+    printf("second.data = %s <--- Sent!\n", second.data);
     printf("first.next = %p <--- Sent!\n", first.next);
     printf("first.data = %s <--- Sent!\n", first.data);
   }
 
   // Send contents of first.data to the screen
-  send_data(first.data, 16);
+  send_data(first.data, 32);
 
   return 0;
 }
