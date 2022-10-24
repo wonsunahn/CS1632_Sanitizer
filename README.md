@@ -15,11 +15,11 @@
   - [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Summer Semester 2022 - Supplementary Exercise 3
+Fall Semester 2022 - Supplementary Exercise 3
 
-DUE: July 28 (Thursday), 2022 11:30 AM
+DUE: October 28 (Friday), 2022 11:59 PM
 
-**GitHub Classroom Link:** https://classroom.github.com/a/lo1nrGKX
+**GitHub Classroom Link:** TBD
 
 ## Description
 
@@ -64,7 +64,7 @@ If you use Windows, please follow these steps:
 
 Once logged in, you may see an unsettling welcome message showing system
 diagnostics.  Don't panic, the machine is just going through some system
-updates and admins haven't yet settled on a nice welcome message. :) 
+updates and admins haven't yet settled on a nice welcome message. :)
 
 ## Building
 
@@ -395,7 +395,7 @@ Now, you should now see the data properly sent to the output in both cases:
 
 
 ```
-$ ./stack_overflow.asan 
+$ ./stack_overflow.asan
 [Sent data]
 48 65 6c 6c 6f 2e 2e  0
 ```
@@ -403,7 +403,7 @@ $ ./stack_overflow.asan
 ```
 $ ./stack_pointer_return.asan
 [Sent data]
- 1  2  3  4  5  6  7  8 
+ 1  2  3  4  5  6  7  8
 ```
 
 Since there are no memory errors, the ASAN instrumentation should not output
