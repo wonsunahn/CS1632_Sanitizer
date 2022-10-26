@@ -19,7 +19,7 @@ Fall Semester 2022 - Supplementary Exercise 3
 
 DUE: October 28 (Friday), 2022 11:59 PM
 
-**GitHub Classroom Link:** TBD
+**GitHub Classroom Link:** https://classroom.github.com/a/TbyJNuTA
 
 ## Description
 
@@ -48,35 +48,26 @@ In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version >=
 computer, I will ask you to connect using SSH to one of the departmental public
 Linux servers at thoth.cs.pitt.edu.
 
-If you use Windows, please follow these steps:
+Please follow these steps:
 
-1. Every OS comes with an SSH commandline client nowadays.  Open a commandline shell (e.g. cmd, terminal) then type:
+1. Every OS (Windows, MacOS, Linux) comes with an SSH commandline client.  Open a commandline shell (e.g. cmd, terminal) then type:
    ```
    $ ssh USERNAME@thoth.cs.pitt.edu
    ```
    Where USERNAME is replaced with your own Pitt ID.
 
-   If you would like a GUI SSH client, Putty is a free open source SSH terminal:
-   https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
-   Connect to "thoth.cs.pitt.edu" by typing that in the "Host Name" box.  Make sure that port is 22 and SSH is selected in the radio button options.
-
-1. Once connected, the host will ask for your Pitt credentials.  Enter your Pitt ID and password.
+1. Once connected, the host will ask for your Pitt credentials.  Enter your Pitt password.
 
 Once logged in, you may see an unsettling welcome message showing system
 diagnostics.  Don't panic, the machine is just going through some system
-updates and admins haven't yet settled on a nice welcome message. :)
+updates and admins haven't yet settled on a nice welcome message. :) 
 
 ## Building
 
-Once logged in, you will also notice that your home directories are empty,
-which may be unsettling for those of you who used thoth before and had files
-there.  That is because the admins have not yet connected your thoth accounts
-to your departmental AFS (Andrew File System) home directories.  For now, your
-home directories are located in the local hard disk.  These home directories
-will be razed once the semester is over.
-
-Create and go to a directory of your choice (or you can stay at your default
-home directory) and then clone your GitHub Classroom repository:
+Once logged in, you will be in your home directory under
+/afs/pitt.edu/home/.  Create and cd into a directory of your choice (or you
+can stay at your home directory) and then clone your GitHub Classroom
+repository:
 
 ```
 $ git clone <your GitHub Classroom repository HTTPS URL>
@@ -87,7 +78,12 @@ account username, but Password is not your password.  Password
 authentication on GitHub has been deprecated on August 2021, so now you have
 to use something called a Personal Authenication Token (PAT) in place of the
 password.  Here are instructions on how to create a PAT:
+
 https://docs.github.com/en/github/authenticating-to-github/keeping-your-account-and-data-secure/creating-a-personal-access-token
+
+Creating a classic PAT is slightly simpler, if you don't need fine-grained
+access control to individual repositories.  Use the PAT to authenticate in
+place of your password when cloning.
 
 Now cd into your cloned directory.  I have provided a Makefile build script
 to automate the build.  All you have to do is invoke 'make':
@@ -102,6 +98,8 @@ gcc -c -g -w stack_overflow.c -o stack_overflow.o
 gcc stack_overflow.o -lm -o stack_overflow.bin
 gcc -c -g -w stack_pointer_return.c -o stack_pointer_return.o
 gcc stack_pointer_return.o -lm -o stack_pointer_return.bin
+gcc -c -g -w heap_overflow.c -o heap_overflow.o
+gcc heap_overflow.o -lm -o heap_overflow.bin
 gcc -c -g -w binary_tree.c -o binary_tree.o
 gcc binary_tree.o -lm -o binary_tree.bin
 gcc -c -g -w -pthread datarace.c -o datarace.o
@@ -110,6 +108,8 @@ gcc -c -g -w -fsanitize=address stack_overflow.c -o stack_overflow.asan.o
 gcc stack_overflow.asan.o -lm -fsanitize=address -o stack_overflow.asan
 gcc -c -g -w -fsanitize=address stack_pointer_return.c -o stack_pointer_return.asan.o
 gcc stack_pointer_return.asan.o -lm -fsanitize=address -o stack_pointer_return.asan
+gcc -c -g -w -fsanitize=address heap_overflow.c -o heap_overflow.asan.o
+gcc heap_overflow.asan.o -lm -fsanitize=address -o heap_overflow.asan
 gcc -c -g -w -fsanitize=address binary_tree.c -o binary_tree.asan.o
 gcc binary_tree.asan.o -lm -fsanitize=address -o binary_tree.asan
 gcc -c -g -w -fPIE -fsanitize=thread -pthread datarace.c -o datarace.tsan.o
@@ -204,123 +204,155 @@ Did you ever get the feeling that your C program that used to behave randomly
 suddenly becomes deterministic when you run it on top of GDB (GNU Debugger)?
 That is because GDB by default turns off ASLR for debugging purposes so that
 behavior is reproducible.  Turning off ASLR can be very useful in a debug
-setting.
+setting.  Let's confirm with our own eyes that GDB does in fact turn off
+ASLR by running it three times:
+
+```
+$ gdb stack.bin
+...
+Reading symbols from stack.bin...
+(gdb) run
+Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
+p = 0x7fffffffe580
+[Inferior 1 (process 3981010) exited normally]
+(gdb) run
+Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
+p = 0x7fffffffe580
+[Inferior 1 (process 3981014) exited normally]
+(gdb) run
+Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
+p = 0x7fffffffe580
+[Inferior 1 (process 3981202) exited normally]
+(gdb)
+```
 
 ### Using Google ASAN (Address Sanitizer)
 
-stack_overflow.c is a buggy program that demonstrates the stack buffer overflow
+1. stack_overflow.c is a buggy program that demonstrates the stack buffer overflow
 issue that we discussed in the lecture.  In the main function, it starts by
-creating a linked list of 3 nodes on the stack.  Then, it sends 16 bytes of
+creating a linked list of 3 nodes on the stack.  Then, it sends 32 bytes of
 first.data to the screen:
 
-```
-send_data(first.data, 16);
-```
+   ```
+   send_data(first.data, 32);
+   ```
 
-First, let's try executing the program a few times as before:
+   First, let's try executing the program a few times as before:
 
-```
-$ ./stack_overflow.bin
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 b0 eb 75 61 fd 7f  0  0
-$ ./stack_overflow.bin
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 b0 49 e2 96 fc 7f  0  0
-$ ./stack_overflow.bin
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 f0 66 5f 9d ff 7f  0  0
-```
+   ```
+   $ ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 c0 60 fb 80 fe 7f  0  0 57 6f 72 6c 64 2e 2e  0 d0 60 fb 80 fe 7f  0  0
+   $ ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 f0 4f 4c bf ff 7f  0  0 57 6f 72 6c 64 2e 2e  0  0 50 4c bf ff 7f  0  0
+   $ ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 e0 87 7e  f fc 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 87 7e  f fc 7f  0  0
+   ```
 
-You can see that this is also a nondeterministic program.  But we only sent
-data to the output and no addresses this time, so where did the nondeterminism
-come from?  If you look more closely, you will notice that the first 8 bytes do
-not change from run to run.  If you know ASCII code, you will be able to
-decypher it to he the "Hello.." string (with nul terminator) inside first.data.
-Then, what are the second 8 bytes that keep on changing?  For that, let's try
-running stack_overflow in verbose mode using the "-v" option:
+   You can see that this is also a nondeterministic program.  But we only
+sent data to the output and no addresses this time, so where did the
+nondeterminism come from?  If you look more closely, you will notice that
+the first 8 bytes do not change from run to run.  If you know ASCII code,
+you will be able to decypher it to he the "Hello.." string (with nul
+terminator) inside first.data.  Then, what are the second 8 bytes that keep
+on changing?  For that, let's try running stack_overflow in verbose mode
+using the "-v" option:
 
-```
-$ ./stack_overflow.bin -v
-[Stack]
-third.data = .......
-third.next = (nil)
-second.data = World..
-second.next = 0x7ffd6175ebb0 <--- Sent!
-first.data = Hello.. <--- Sent!
-first.next = 0x7ffd6175eba0
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 b0 eb 75 61 fd 7f  0  0
-```
+   ```
+   $ ./stack_overflow.bin -v
+   [Stack Frame]
+   return address = 0x7f2cf873d0b3
+   old base pointer = (nil) <--- base pointer
+   padding (8 bytes)
+   padding (8 bytes)
+   third.next = (nil)
+   third.data = .......
+   second.next = 0x7fffeca47e60 <--- Sent!
+   second.data = World.. <--- Sent!
+   first.next = 0x7fffeca47e50 <--- Sent!
+   first.data = Hello.. <--- Sent!
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 50 7e a4 ec ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 60 7e a4 ec ff 7f  0  0
+   ```
 
-You will notice that the second 8 bytes is the pointer address inside
-second.next (in reverse, since x86 architecture uses little endian ordering)!
-So why is second.next being sent along with first.data?  That is because the
-first.data buffer is only 8 bytes long, so when send_data attempts to send 16
-bytes, it also sends the 8 bytes that come after first.data, which in the stack
-layout happens to be second.next.
+   You will notice that the second 8 bytes is the pointer address inside
+first.next (in reverse, since x86 architecture uses little endian ordering)!
+So why is first.next being sent along with first.data?  That is because the
+first.data buffer is only 8 bytes long, so when send_data attempts to send
+32 bytes, it also sends the 8 bytes that come after first.data, which in the
+stack layout happens to be first.next.
 
-In short, the address inside second.next **leaks out** to program output even
-though the programmer never intended it in the source code.  And this address
-randomized by ASLR is what is causing the nondeterminism.  Of course, you could
-again turn off ASLR to make the buggy program run deterministically at least
-while debugging:
+   In short, the address inside first.next **leaks out** to program output
+even though the programmer never intended it in the source code.  And this
+address randomized by ASLR is what is causing the nondeterminism.  Of
+course, you could again turn off ASLR to make the buggy program run
+deterministically, at least while debugging:
 
-```
-$ bash run_aslr_off.sh ./stack_overflow.bin
-setarch x86_64 -R ./a.out
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 e0 e3 ff ff ff 7f  0  0
-$ bash run_aslr_off.sh ./stack_overflow.bin
-setarch x86_64 -R ./a.out
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 e0 e3 ff ff ff 7f  0  0
-$ bash run_aslr_off.sh ./stack_overflow.bin
-setarch x86_64 -R ./a.out
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0 e0 e3 ff ff ff 7f  0  0
-```
+   ```
+   $ bash run_aslr_off.sh ./stack_overflow.bin
+   setarch x86_64 -R ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
+   $ bash run_aslr_off.sh ./stack_overflow.bin
+   setarch x86_64 -R ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
+   $ bash run_aslr_off.sh ./stack_overflow.bin
+   setarch x86_64 -R ./stack_overflow.bin
+   [Sent data]
+   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
+   ```
 
-But your end users will most likely have ASLR turned on in their machines for
-security.  What then?  Your programs will again be nondeterministic and testing
-would no longer guarantee correct behavior.  So we may still get surprise
-defects.
+   Note that the memory error still exists, but the program is going to be
+easier to debug since at least you can reproduce the same behavior every
+time you run the program.
 
-How can we have a deterministic program when all addresses are randomized?
+   But when the time comes to deploy your program, your end users will most
+likely have ASLR turned on in their machines for security.  What then?  Your
+programs will again be nondeterministic, and even if the program ran
+correctly when debugging with ASLR turned off, there is no guarantee that
+the correct behavior will be reproduced with ASLR turned back on.  So we may
+still get surprise defects.
+
+   How can we have a deterministic program when all addresses are randomized?
 Easy: just don't let addresses leak out to program output!  As we discussed,
-unless for debugging purposes, programs will almost never intentionally output
-addresses where data is stored --- they will typically output the data.  It is
-just that addresses leak out to output due to memory errors (like in this
-case).  So if we can catch all memory errors, then problem solved!  ASAN is
-exactly the kind of tool that can help you do that.
+unless for debugging purposes, programs will almost never intentionally
+output addresses where data is stored --- they will typically output the
+data.  It is just that addresses leak out to output due to memory errors
+(like in this case).  So if we can catch all memory errors, then problem
+solved!  ASAN is exactly the kind of tool that can help you do that.
 
-Now let's see if ASAN can find the bug for us by running the instrumented binary:
+   Now let's see if ASAN can find the bug for us by running the instrumented binary:
 
-```
-$ ./stack_overflow.asan
-[Sent data]
-=================================================================
-==2438106==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7fffd2a23770 at pc 0x556267aa2353 bp 0x7fffd2a236f0 sp 0x7fffd2a236e0
-READ of size 1 at 0x7fffd2a23770 thread T0
-    #0 0x556267aa2352 in send_data /home/PITT/wahn/nondeterminism/C/stack_overflow.c:17
-    #1 0x556267aa2809 in main /home/PITT/wahn/nondeterminism/C/stack_overflow.c:45
-    #2 0x7f5c31cfd0b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x270b2)
-    #3 0x556267aa222d in _start (/u/home/PITT/wahn/nondeterminism/C/stack_overflow.asan+0x122d)
+   ```
+   $ ./stack_overflow.asan
+   [Sent data]
+   =================================================================
+   ==3982981==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7ffc5e8d3330 at pc 0x56480b55c353 bp 0x7ffc5e8d32b0 sp 0x7ffc5e8d32a0
+   READ of size 1 at 0x7ffc5e8d3330 thread T0
+       #0 0x56480b55c352 in send_data /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:17
+       #1 0x56480b55c8a3 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:49
+       #2 0x7f429c3fb0b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x240b2)
+       #3 0x56480b55c22d in _start (/afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.asan+0x222d)
 
-Address 0x7fffd2a23770 is located in stack of thread T0 at offset 48 in frame
-    #0 0x556267aa2394 in main /home/PITT/wahn/nondeterminism/C/stack_overflow.c:22
+   Address 0x7ffc5e8d3330 is located in stack of thread T0 at offset 48 in frame
+       #0 0x56480b55c394 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:22
 
-  This frame has 3 object(s):
-    [32, 48) 'first' (line 23) <== Memory access at offset 48 overflows this variable
-    [64, 80) 'second' (line 23)
-    [96, 112) 'third' (line 23)
-...
-```
+     This frame has 3 object(s):
+       [32, 48) 'first' (line 23) <== Memory access at offset 48 overflows this variable
+       [64, 80) 'second' (line 23)
+       [96, 112) 'third' (line 23)
+   ...
+   ```
 
-ASAN is able to pinpoint exactly where the illegal "READ of size 1" happened at
-stack_overflow.c:17!  That is where the out of bounds array access happens.
-Below that line is the stack trace so we know the calling context.
+   ASAN is able to pinpoint exactly where the illegal "READ of size 1"
+happened at stack_overflow.c:17!  That is where the out of bounds array
+access happens.  Below that line is the stack trace so we know the calling
+context.
 
-stack_pointer_return.c is another buggy program with a common memory error
+1. stack_pointer_return.c is another buggy program with a common memory error
 where a function returns a pointer to a local array.  When the function
 returns, the local array is deallocated with the rest of the function frame
 as it is now out of scope, thereby leaving the pointer dangling.  Similar to
@@ -332,53 +364,144 @@ bar() rather than leaving it dangling (which is a good choice).  So, you get
 deterministic behavior in this case --- it's just that accessing a null
 pointer results in a segmentation fault:
 
-```
-$ ./stack_pointer_return.bin
-Segmentation fault (core dumped)
-```
 
-Old versions of GCC and some other compilers would just leave the pointer
+   ```
+   $ ./stack_pointer_return.bin
+   Segmentation fault (core dumped)
+   ```
+
+   Old versions of GCC and some other compilers would just leave the pointer
 dangling which would cause an access of a dangling pointer.  So what happens
 then?  Well, the pointer is dangling because the memory that it used to
 point to is deallocated.  That piece of memory eventually gets reallocated
 to hold other values (in this case, when a new stack frame is allocated).
 If that value is an address, you would get nondeterministic behavior.
 
-In any case, it is a memory error that needs to be fixed!  So let's see if
+   In any case, it is a memory error that needs to be fixed!  So let's see if
 ASAN can help us this time as well:
 
-```
-$ ./stack_pointer_return.asan
-[Sent data]
-AddressSanitizer:DEADLYSIGNAL
-=================================================================
-==2438240==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x561accf992c7 bp 0x7ffc3c7d7630 sp 0x7ffc3c7d7610 T0)
-==2438240==The signal is caused by a READ memory access.
-==2438240==Hint: address points to the zero page.
-    #0 0x561accf992c6 in send_data /home/PITT/wahn/nondeterminism/C/stack_pointer_return.c:7
-    #1 0x561accf99428 in main /home/PITT/wahn/nondeterminism/C/stack_pointer_return.c:22
-    #2 0x7f40b08d10b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x270b2)
-    #3 0x561accf991ad in _start (/u/home/PITT/wahn/nondeterminism/C/stack_pointer_return.asan+0x11ad)
+   ```
+   $ ./stack_pointer_return.asan
+   [Sent data]
+   AddressSanitizer:DEADLYSIGNAL
+   =================================================================
+   ==3983404==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x55be4fe0f2f3 bp 0x7ffff2292920 sp 0x7ffff2292900 T0)
+   ==3983404==The signal is caused by a READ memory access.
+   ==3983404==Hint: address points to the zero page.
+       #0 0x55be4fe0f2f2 in send_data /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:8
+       #1 0x55be4fe0f454 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:23
+       #2 0x7f6edbe040b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x240b2)
+       #3 0x55be4fe0f1cd in _start (/afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.asan+0x11cd)
 
-AddressSanitizer can not provide additional info.
-SUMMARY: AddressSanitizer: SEGV /home/PITT/wahn/nondeterminism/C/stack_pointer_return.c:7 in send_data
-==2438240==ABORTING
-```
+   AddressSanitizer can not provide additional info.
+   SUMMARY: AddressSanitizer: SEGV /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:8 in send_data
+   ==3983404==ABORTING
+   ```
 
-Again, stack_pointer_return.c:7 is flagged as an illegal read because it is
-attempting to read a location that has already been deallocated.  
+   Again, stack_pointer_return.c:8 is flagged as an illegal read because it
+is attempting to read a location that has already been deallocated.  
+
+1. heap_overflow,c has a memory error on the heap.  It displays
+   nondeterministic behavior due to this error, just like before:
+
+   ```
+   $ ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@r}kU
+   Name check result = 0
+   $ ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@[rU
+   Name check result = 0
+   $ ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@TU
+   Name check result = 0
+   ```
+
+   Note the random string for tree-\>name.  Again we can temporarily disable
+ASLR to obtain deterministic behavior:
+
+   ```
+   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
+   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@WUUU
+   Name check result = 0
+   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
+   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@WUUU
+   Name check result = 0
+   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
+   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
+   Failure: name=helloworld, tree->name=hellowor@WUUU
+   Name check result = 0
+   ```
+
+   But again, to fundamentally solve the issue, we need to get rid of the
+memory error to begin with.  Let's use ASAN for the purpose.
+
+   ```
+   $ ./heap_overflow.asan 10 helloworld
+   Failure: name=helloworld, tree->name=helloworp
+   Name check result = 0
+   ```
+
+   Wait, why didn't ASAN detect the error?  Hmmm.  Let's try a longer string
+this time:
+
+   ```
+   $ ./heap_overflow.asan 10 Astringlongerthan24bytes
+   =================================================================
+   ==3996490==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x603000000028 at pc 0x7fb60e2a216d bp 0x7ffc25db0540 sp 0x7ffc25dafce8
+   WRITE of size 25 at 0x603000000028 thread T0
+       #0 0x7fb60e2a216c in __interceptor_strcpy ../../../../src/libsanitizer/asan/asan_interceptors.cc:431
+       #1 0x55918f9852e1 in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:32
+       #2 0x55918f9854e4 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
+   ...
+   0x603000000028 is located 0 bytes to the right of 24-byte region [0x603000000010,0x603000000028)
+   allocated by thread T0 here:
+       #0 0x7fb60e313808 in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cc:144
+       #1 0x55918f9852ca in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:30
+       #2 0x55918f9854e4 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
+   ...
+   ```
+
+   Success!  There was a write of 25 bytes to location 0x603000000028 at
+heap_overflow.c:32.  And that location 0x603000000028 was allocated as a
+24-byte region at heap_overflow.c:30.  That 24-byte region would be the
+treeNode struct that was allocated at that line.  The treeNode is 24 bytes
+because it consists of two pointers, 8 bytes each, and a char array of 4
+bytes which is padded to 8 bytes for alignment.
+
+   That shines a light into the mystery of why the original string
+"helloworld" did not trigger detection by ASAN.  ASAN maintains a "shadow
+memory" of allocated memory regions and the string needed to be long enough
+to overflow the region for detection to happen.  This is a limitation in
+ASAN.  There is obviously an error even with the shorter "helloworld"
+string --- it is just that ASAN was not able to detect it --- a false
+negative.  But if you think about it, you can understand why it is so hard
+for ASAN to detect an illegal offset access within an allocation region.
+Even when the strcpy write overflows from new-\>name into new-\>left, that
+is technically a legal access in the C programming language.  The access
+still happens within the bounds of allocated memory, so according to C
+specifications, the behavior is well-defined and it is technically not a
+memory error!  
+
+   Once you understand this aspect of ASAN, you will understand that sometimes
+you need to longer strings to turn overflows into true memory errors and
+allow detection.
+
 
 ### Debugging
 
-Modify stack_overflow.c and stack_pointer_return.c so that they no longer
-contain memory errors.  You can use 'nano', a very simple editor:
+Modify stack_overflow.c, stack_pointer_return.c, and heap_overflow.c so that
+they no longer contain memory errors.  You can use 'nano', a very simple
+editor:
 
 ```
 $ nano stack_overflow.c
 ```
 
-Or you can use your favorite Linux editor (mine is Vim), or feel free to
-edit the files on your favorite IDE on your laptop and upload to thoth.
+Or you can use your favorite Linux editor (mine is Vim).  Or edit the files
+on VSCode on your laptop and git push to the repository, after which you can
+git pull from thoth.
 
 Once you are done, invoke 'make' again to recompile the binaries:
 
@@ -395,7 +518,7 @@ Now, you should now see the data properly sent to the output in both cases:
 
 
 ```
-$ ./stack_overflow.asan
+$ ./stack_overflow.asan 
 [Sent data]
 48 65 6c 6c 6f 2e 2e  0
 ```
@@ -403,7 +526,12 @@ $ ./stack_overflow.asan
 ```
 $ ./stack_pointer_return.asan
 [Sent data]
- 1  2  3  4  5  6  7  8
+ 1  2  3  4  5  6  7  8 
+```
+
+```
+$ ./heap_overflow.asan 10 Astringlongerthan24bytes
+Name check result = 1
 ```
 
 Since there are no memory errors, the ASAN instrumentation should not output
@@ -417,6 +545,8 @@ If you are stuck debugging the programs, here are some hints:
    location.  One way to fix it is to declare the array to be a static local
 variable so that it gets moved from the stack to static memory which has
 persistent duration.  
+1. heap_overflow.c currently has a statically sized char array for name.  To
+   allow arbitrarily long names, consider using strdup instead of strcpy.
 
 ### Comparing Google ASAN with Valgrind
 
