@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 typedef struct _Node {
   unsigned char data[8];
@@ -33,8 +34,8 @@ int main(int argc, char **argv) {
   // Optionally print out stack layout in verbose mode
   if (argc == 2 && strcmp(argv[1], "-v") == 0) { 
     printf("[Stack Frame]\n");
-    printf("return address = %p\n", *((u_int64_t*)&third.next + 4));
-    printf("old base pointer = %p <--- base pointer\n", *((u_int64_t*)&third.next + 3));
+    printf("return address = %p\n", *((uint64_t*)&third.next + 4));
+    printf("old base pointer = %p <--- base pointer\n", *((uint64_t*)&third.next + 3));
     printf("padding (8 bytes)\n");
     printf("padding (8 bytes)\n");
     printf("third.next = %p\n", third.next);
