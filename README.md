@@ -15,9 +15,9 @@
   - [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Spring Semester 2023 - Supplementary Exercise 3
+Summer Semester 2023 - Supplementary Exercise 3
 
-DUE: March 17 (Friday), 2023 11:59 PM
+DUE: July 27 (Thursday), 2023 11:30 AM
 
 **GitHub Classroom Link:** TBD
 
