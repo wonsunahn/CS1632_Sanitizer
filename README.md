@@ -584,8 +584,7 @@ nano stack_overflow.c
 ```
 
 Or you can use your favorite Linux editor (mine is Vim).  Or edit the files
-on VSCode on your laptop and git push to the repository, after which you can
-git pull from thoth.
+on VSCode if you used the VSCode Remote SSH extension to connect.
 
 Once you are done, invoke 'make' again to recompile the binaries:
 
