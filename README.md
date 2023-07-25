@@ -1,25 +1,27 @@
 - [CS 1632 - Software Quality Assurance](#cs-1632---software-quality-assurance)
-  - [Description](#description)
-  - [Connecting to thoth.cs.pitt.edu](#connecting-to-thothcspittedu)
-  - [Building](#building)
-  - [Testing and Debugging Memory Errors](#testing-and-debugging-memory-errors)
-    - [Turning off ASLR (Address Space Layout Randomization)](#turning-off-aslr-address-space-layout-randomization)
-    - [Using Google ASAN (Address Sanitizer)](#using-google-asan-address-sanitizer)
-    - [Debugging](#debugging)
-    - [Comparing Google ASAN with Valgrind](#comparing-google-asan-with-valgrind)
-  - [Testing and Debugging Datarace Errors](#testing-and-debugging-datarace-errors)
-    - [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
-    - [Debugging](#debugging-1)
-  - [Submission](#submission)
-  - [Division of Work](#division-of-work)
-  - [Resources](#resources)
+  * [Description](#description)
+  * [Connecting to thoth.cs.pitt.edu](#connecting-to-thothcspittedu)
+    + [Using VSCode Remote SSH Extension (recommended)](#using-vscode-remote-ssh-extension-recommended)
+    + [Using commandline SSH client (not recommended)](#using-commandline-ssh-client-not-recommended)
+  * [Building](#building)
+  * [Testing and Debugging Memory Errors](#testing-and-debugging-memory-errors)
+    + [Turning off ASLR (Address Space Layout Randomization)](#turning-off-aslr-address-space-layout-randomization)
+    + [Using Google ASAN (Address Sanitizer)](#using-google-asan-address-sanitizer)
+    + [Debugging](#debugging)
+    + [Comparing Google ASAN with Valgrind](#comparing-google-asan-with-valgrind)
+  * [Testing and Debugging Datarace Errors](#testing-and-debugging-datarace-errors)
+    + [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
+    + [Debugging](#debugging-1)
+  * [Submission](#submission)
+  * [Division of Work](#division-of-work)
+  * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
 Summer Semester 2023 - Supplementary Exercise 3
 
 DUE: July 27 (Thursday), 2023 11:30 AM
 
-**GitHub Classroom Link:** TBD
+**GitHub Classroom Link:** https://classroom.github.com/a/IgUU3oPZ
 
 ## Description
 
@@ -44,23 +46,54 @@ Nondeterminism lecture.  By trying out these programs, you will learn the follow
 
 ## Connecting to thoth.cs.pitt.edu
 
-In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version >= 4.8.  Since you are unlikely to have either installed on your local
+In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version >= 4.8.
+Since you are unlikely to have either installed on your local
 computer, I will ask you to connect using SSH to one of the departmental public
-Linux servers at thoth.cs.pitt.edu.
+Linux servers at thoth.cs.pitt.edu.  There are two ways you can do this, using
+VSCode Remote SSH (recommended) or using the commandline SSH client on a
+terminal.
+
+### Using VSCode Remote SSH Extension (recommended)
+
+Please follow these steps:
+
+1. On VSCode, install the "Remote - SSH" extension by searching for it on the extensions menu on the left:
+   https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh
+
+1. Go to the "Remote - SSH" extension settings by clicking on the settings icon
+and then uncheck the "Use Flock" setting.  Make sure you do this, or you will
+not be able to edit files remotely later on.  The setting looks like the below
+image:
+
+   <img alt="Uncheck Use Flock setting" src="img/remote-ssh-uncheck-use-flock.png">
+
+1. By now, you should see a "Remote Explorer" icon pop up on the left hand
+menu.  Create a new connection by clicking on the "+" icon for a new
+connection.  On the command prompt that says "Enter SSH Connection Command",
+enter the following:
+   ```
+   ssh USERNAME@thoth.cs.pitt.edu
+   ```
+   Where USERNAME is replaced with your own Pitt ID.
+
+1. This will create a new SSH connection named "thoth.cs.pitt.edu".  Click the
+connect icon.  This will prompt you for your Pitt password.  Enter then
+password.  If the connection was successful, when clicking on the "Remote
+Explorer" menu, you should see a green check mark next to "thoth.cs.pitt.edu".
+
+1. Go to View > Terminal and you should see a terminal logged on to thoth.
+
+### Using commandline SSH client (not recommended)
 
 Please follow these steps:
 
 1. Every OS (Windows, MacOS, Linux) comes with an SSH commandline client.  Open a commandline shell (e.g. cmd, terminal) then type:
    ```
-   $ ssh USERNAME@thoth.cs.pitt.edu
+   ssh USERNAME@thoth.cs.pitt.edu
    ```
    Where USERNAME is replaced with your own Pitt ID.
 
 1. Once connected, the host will ask for your Pitt credentials.  Enter your Pitt password.
-
-Once logged in, you may see an unsettling welcome message showing system
-diagnostics.  Don't panic, the machine is just going through some system
-updates and admins haven't yet settled on a nice welcome message. :) 
 
 ## Building
 
@@ -70,7 +103,7 @@ can stay at your home directory) and then clone your GitHub Classroom
 repository:
 
 ```
-$ git clone <your GitHub Classroom repository HTTPS URL>
+git clone <your GitHub Classroom repository HTTPS URL>
 ```
 
 This will ask for your Username and Password.  Username is your GitHub
@@ -129,6 +162,19 @@ TSAN to work flawlessly (I'm assuming you learned what PIE is in CS 449).
 
 ## Testing and Debugging Memory Errors
 
+If you connected through the VSCode Remote SSH extension, you have the luxury
+of being able to edit code within the VSCode IDE.  Click on the "Explorer" icon
+on the left hand menu (the first one), and there you will see a button "Open
+Folder".  Then you will be prompted to navigate the remote thoth file system.
+Navigate to the folder where you cloned your GitHub Classroom repository and
+open it.  You will be prompted again for your password, and you can use your
+Pitt password again.  Once you do so, you will see all the files on the remote
+thoth folder under the Explorer tab.  You can open source files and edit them
+from VSCode and all changes will be automatically reflected on the remote thoth
+file system.  The below explanations use the "nano" commandline editor.  You
+can use that editor (or any other editor if you prefer it over the VSCode IDE),
+but most people would prefer VSCode. 
+
 ### Turning off ASLR (Address Space Layout Randomization)
 
 heap.c is a simple program that mallocs some bytes on the heap and prints out
@@ -136,7 +182,7 @@ the pointer to that heap location.  You can use 'nano' to view the file on the
 terminal (or your favorite Linux editor):
 
 ```
-$ nano heap.c
+nano heap.c
 ```
 
 Or, you can view it on the GitHub.  As we learned, even this simple program can
@@ -496,7 +542,7 @@ they no longer contain memory errors.  You can use 'nano', a very simple
 editor:
 
 ```
-$ nano stack_overflow.c
+nano stack_overflow.c
 ```
 
 Or you can use your favorite Linux editor (mine is Vim).  Or edit the files
@@ -674,7 +720,7 @@ the GitHub.com origin repository.  Before you do that, let's clean up the
 repository such that you remove all generated binary files:
 
 ```
-$ make clean
+make clean
 ```
 
 Once you do that, if you do 'git status' you should see only three modified
@@ -700,7 +746,7 @@ Now, let's commit those files to your local repository (after adding the
 modifications using the -a option):
 
 ```
-$ git commit -a
+git commit -a
 ```
 
 That will launch an editor where you can add comments.  After saving the
@@ -708,7 +754,7 @@ comments, you will see the commit happening.  Now the only thing left to do
 is to push the changes to the origin:
 
 ```
-$ git push
+git push
 ```
 
 Feel free to double check that your changes have to been reflected on to
