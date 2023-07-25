@@ -83,24 +83,15 @@ void DeleteTree(treeNode* tree)
 int main(int argc, char* argv[])
 {
     const char *name;
-    unsigned   N, depth, minDepth, maxDepth, stretchDepth;
-    treeNode   *stretchTree, *longLivedTree, *tempTree;
+    unsigned   depth;
+    treeNode   *tree;
 
-    N = atol(argv[1]);
+    depth = atol(argv[1]);
     name = argv[2];
 
-    minDepth = 4;
-
-    if ((minDepth + 2) > N)
-        maxDepth = minDepth + 2;
-    else
-        maxDepth = N;
-
-    stretchDepth = maxDepth + 1;
-
-    stretchTree = BottomUpTree(name, stretchDepth);
-    int result = NameCheck(name, stretchTree);
-    DeleteTree(stretchTree);
+    tree = BottomUpTree(name, depth);
+    int result = NameCheck(name, tree);
+    DeleteTree(tree);
 
     printf("Name check result = %d\n", result);
 
