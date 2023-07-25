@@ -272,6 +272,44 @@ p = 0x7fffffffe580
 (gdb)
 ```
 
+If you want to probe deeper, "personality" is the system call used in both
+"setarch" and "gdb" that turns off ASLR.  A brief look at 'man personality'
+shows:
+
+```
+$ man personality
+...
+SYNOPSIS
+       #include <sys/personality.h>
+
+       int personality(unsigned long persona);
+
+DESCRIPTION
+...
+       The flag values are as follows:
+...
+       ADDR_NO_RANDOMIZE (since Linux 2.6.12)
+              With this flag set, disable address-space-layout randomization.
+...
+```
+
+You can see through the "strace" Linux system call trace utility that
+"personality" is called with the "ADDR_NO_RANDOMIZE" argument both when
+stack.bin is invoked on top of "setarch -R" or on top of "gdb":
+
+```
+$ strace setarch -R ./stack.bin 2>&1 |grep personality
+personality(PER_LINUX|ADDR_NO_RANDOMIZE) = 0 (PER_LINUX)
+```
+
+```
+$ strace gdb -ex=r -ex=q stack.bin 2>&1 |grep personality
+personality(0xffffffff)                 = 0 (PER_LINUX)
+personality(PER_LINUX|ADDR_NO_RANDOMIZE) = 0 (PER_LINUX)
+personality(0xffffffff)                 = 0x40000 (PER_LINUX|ADDR_NO_RANDOMIZE)
+personality(PER_LINUX)                  = 0x40000 (PER_LINUX|ADDR_NO_RANDOMIZE)
+```
+
 ### Using Google ASAN (Address Sanitizer)
 
 1. stack_overflow.c is a buggy program that demonstrates the stack buffer overflow
