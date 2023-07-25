@@ -533,17 +533,17 @@ this time:
    ```
    $ ./heap_overflow.asan 10 Astringlongerthan24bytes
    =================================================================
-   ==3996490==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x603000000028 at pc 0x7fb60e2a216d bp 0x7ffc25db0540 sp 0x7ffc25dafce8
-   WRITE of size 25 at 0x603000000028 thread T0
-       #0 0x7fb60e2a216c in __interceptor_strcpy ../../../../src/libsanitizer/asan/asan_interceptors.cc:431
-       #1 0x55918f9852e1 in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:32
-       #2 0x55918f9854e4 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
+   ==2678929==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x603000000058 at pc 0x7f550731e4bf bp 0x7fff895b4920 sp 0x7fff895b40c8
+   WRITE of size 25 at 0x603000000058 thread T0
+       #0 0x7f550731e4be in __interceptor_strcpy ../../../../src/libsanitizer/asan/asan_interceptors.cpp:440
+       #1 0x55e6766a72e1 in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:32
+    #2 0x55e6766a74e7 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
    ...
-   0x603000000028 is located 0 bytes to the right of 24-byte region [0x603000000010,0x603000000028)
+   0x603000000058 is located 0 bytes to the right of 24-byte region [0x603000000040,0x603000000058)
    allocated by thread T0 here:
-       #0 0x7fb60e313808 in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cc:144
-       #1 0x55918f9852ca in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:30
-       #2 0x55918f9854e4 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
+       #0 0x7f550737e867 in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
+       #1 0x55e6766a72ca in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:30
+       #2 0x55e6766a74e7 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
    ...
    ```
 
