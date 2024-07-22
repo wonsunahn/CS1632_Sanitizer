@@ -17,11 +17,11 @@
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Spring Semester 2024 - Supplementary Exercise 3
+Summer Semester 2024 - Supplementary Exercise 3
 
-DUE: March 10 (Sunday), 2024 11:59 PM
+DUE: July 25 (Tuesday), 2024 8:30 AM
 
-**GitHub Classroom Link:** https://classroom.github.com/a/baOB8a1D
+**GitHub Classroom Link:** TBD
 
 ## Description
 
