@@ -3,7 +3,7 @@
 {
 	"name": "Ubuntu",
 	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/base:jammy",
+	"image": "mcr.microsoft.com/vscode/devcontainers/base:ubuntu-18.04",
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/vscode-cli:1": {},
 		"ghcr.io/devcontainers-contrib/features/vscode-server:1": {},
