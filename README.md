@@ -21,7 +21,7 @@ Summer Semester 2024 - Supplementary Exercise 3
 
 DUE: July 25 (Tuesday), 2024 8:30 AM
 
-**GitHub Classroom Link:** TBD
+**GitHub Classroom Link:** https://classroom.github.com/a/f4PRG-ba
 
 ## Description
 
@@ -46,8 +46,8 @@ Nondeterminism lecture.  By trying out these programs, you will learn the follow
 
 ## Setting up Build Environment
 
-In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version
->= 4.8.  Since you are unlikely to have either installed on your local
+In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version >= 4.8.
+Since you are unlikely to have either installed on your local
 computer, I am going to ask you to download and install the official GCC Docker
 image and launch a Docker container so you can connect to it and work on the
 exercise.
