@@ -17,11 +17,11 @@
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Summer Semester 2024 - Supplementary Exercise 3
+Fall Semester 2024 - Supplementary Exercise 3
 
-DUE: July 25 (Tuesday), 2024 8:30 AM
+DUE: October 30 (Wednesday), 2024 before start of class
 
-**GitHub Classroom Link:** https://classroom.github.com/a/f4PRG-ba
+**GitHub Classroom Link:** TBD
 
 ## Description
 
