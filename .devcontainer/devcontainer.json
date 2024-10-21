@@ -8,5 +8,6 @@
 		"--cap-add=SYS_PTRACE",
 		"--security-opt",
 		"seccomp=unconfined"
-	]
+	],
+	"postCreateCommand": "sudo apt-get update && sudo apt-get -y install gdb"
 }
