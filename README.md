@@ -694,10 +694,15 @@ $ ./datarace.bin
 shared=1021775
 ```
 
-Now let's try using TSAN to discover this bug by running the instrumented binary:
+Now let's try using TSAN to discover this bug by running the instrumented
+datarace.tsan binary.  Note that we need to run TSAN with ASLR off, which is in
+theory not necessary, but is necessary in this case because of compatibility
+with how Ubuntu 24.04 (the linux version for our current devcontainer) does
+ASLR with an entropy of 32 bits (vm.mmap_rnd_bits=32).  Don't worry if that
+does not make sense to you --- just make sure you run TSAN with ALSR off.
 
 ```
-$ ./datarace.tsan
+$ bash run_aslr_off.sh ./datarace.tsan
 ==================
 WARNING: ThreadSanitizer: data race (pid=2438881)
   Write of size 4 at 0x55eb33b6f014 by thread T1:
