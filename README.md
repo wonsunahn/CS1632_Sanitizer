@@ -12,15 +12,14 @@
     + [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
     + [Debugging](#debugging-1)
   * [Submission](#submission)
-  * [Division of Work](#division-of-work)
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Fall Semester 2024 - Supplementary Exercise 3
+Spring Semester 2025 - Supplementary Exercise 3
 
-DUE: October 30 (Wednesday), 2024 before start of class
+DUE: March 20 (Thursday), 2025 before start of class
 
-**GitHub Classroom Link:** https://classroom.github.com/a/4BUc3WWX
+**GitHub Classroom Link:** TBD
 
 ## Description
 
@@ -726,11 +725,6 @@ the "Supplementary Exercise 1 GitHub" link.
 Again, don't forget to add your partner to each submission.  You can
 resubmit as many times as you with until you get a perfect score on the
 autograder.
-
-## Division of Work
-
-For this exercise, I recommend that you both try to do the full exercise.
-Compare your debugged files in the end, discuss, and submit!
 
 ## Resources
 
