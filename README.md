@@ -15,9 +15,9 @@
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Summer Semester 2025 - Supplementary Exercise 3
+Fall Semester 2025 - Supplementary Exercise 3
 
-DUE: July 24 (Thursday), 2025 before start of class
+DUE: October 27 (Monday), 2025 before start of class
 
 **GitHub Classroom Link:** TBD
 
