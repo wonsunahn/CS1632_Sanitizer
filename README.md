@@ -684,7 +684,7 @@ repository such that you remove all generated binary files:
 make clean
 ```
 
-Once you do that, if you do 'git status' you should see only three modified
+Once you do that, if you do 'git status' you should see only four modified
 files:
 
 ```
