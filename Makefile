@@ -1,54 +1,37 @@
-TARGETS = heap.bin stack.bin stack_overflow.bin stack_pointer_return.bin heap_overflow.bin binary_tree.bin datarace.bin
-OBJS = heap.o stack.o stack_overflow.o o stack_pointer_return.o heap_overflow.o binary_tree.o datarace.o
-ASANTARGETS = stack_overflow.asan stack_pointer_return.asan heap_overflow.asan binary_tree.asan
-ASANOBJS = stack_overflow.asan.o stack_pointer_return.asan.o heap_overflow.asan.o binary_tree.asan.o
-TSANTARGETS = datarace.tsan
-TSANOBJS = datarace.tsan.o
+# Every program gets a plain build (.bin).  Programs listed in ASAN_PROGS or
+# TSAN_PROGS also get an AddressSanitizer (.asan) or ThreadSanitizer (.tsan)
+# build.  To add a program, add its name (without .c) to the right lists.
+# All binaries are written to $(BINDIR).
+PROGS      = binary_tree sorted_list
+ASAN_PROGS = binary_tree
+TSAN_PROGS = sorted_list
 
-CC = gcc
+BINDIR  = bin
+TARGETS = $(addprefix $(BINDIR)/, $(PROGS:=.bin) $(ASAN_PROGS:=.asan) $(TSAN_PROGS:=.tsan))
 
-COPT = -g -w -std=gnu99
-LOPT = -lm
+CC     = gcc
+CFLAGS = -g -w -std=gnu99 -pthread
+LDLIBS = -lm
 
-ASANCOPT = -fsanitize=address
-ASANLOPT = -fsanitize=address
+ASAN_FLAGS = -fsanitize=address
+TSAN_FLAGS = -fPIE -pie -fsanitize=thread
 
-TSANCOPT = -fPIE -fsanitize=thread
-TSANLOPT = -pie -fsanitize=thread
+.PHONY: all clean
 
-all: $(TARGETS) $(ASANTARGETS) $(TSANTARGETS)
+all: $(TARGETS)
 
-%.o: %.c
-	$(CC) -c $(COPT) $< -o $@
+# "| $(BINDIR)" creates bin/ first without rebuilding when its timestamp changes.
+$(BINDIR)/%.bin: %.c | $(BINDIR)
+	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
 
-%.asan.o: %.c
-	$(CC) -c $(COPT) $(ASANCOPT) $< -o $@
+$(BINDIR)/%.asan: %.c | $(BINDIR)
+	$(CC) $(CFLAGS) $(ASAN_FLAGS) $< $(LDLIBS) -o $@
 
-%.tsan.o: %.c
-	$(CC) -c $(COPT) $(TSANCOPT) $< -o $@
+$(BINDIR)/%.tsan: %.c | $(BINDIR)
+	$(CC) $(CFLAGS) $(TSAN_FLAGS) $< $(LDLIBS) -o $@
 
-%.bin: %.o
-	$(CC) $< $(LOPT) -o $@
-
-%.asan: %.asan.o
-	$(CC) $< $(LOPT) $(ASANLOPT) -o $@
-
-%.tsan: %.tsan.o
-	$(CC) $< $(LOPT) $(TSANLOPT) -o $@
-
-datarace.o: datarace.c
-	$(CC) -c $(COPT) -pthread $< -o $@
-
-datarace.bin: datarace.o
-	$(CC) $< $(LOPT) -pthread -o $@
-
-datarace.tsan.o: datarace.c
-	$(CC) -c $(COPT) $(TSANCOPT) -pthread $< -o $@
-
-datarace.tsan.bin: datarace.o
-	$(CC) $< $(LOPT) $(TSANLOPT) -pthread -o $@
-
-.PRECIOUS: $(OBJS) $(ASANOBJS) $(TSANOBJS)
+$(BINDIR):
+	mkdir -p $@
 
 clean:
-	rm -f $(TARGETS) $(ASANTARGETS) $(TSANTARGETS) $(OBJS) $(ASANOBJS) $(TSANOBJS)
+	rm -rf $(BINDIR)

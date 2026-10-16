@@ -1,678 +1,434 @@
 - [CS 1632 - Software Quality Assurance](#cs-1632---software-quality-assurance)
   * [Description](#description)
-  * [Setting up Build Environment](#setting-up-build-environment)
-    + [Building](#building)
-    + [Editing Source Code on VSCode Desktop](#editing-source-code-on-vscode-desktop)
-  * [Testing and Debugging Memory Errors](#testing-and-debugging-memory-errors)
-    + [Turning off ASLR (Address Space Layout Randomization)](#turning-off-aslr-address-space-layout-randomization)
-    + [Using Google ASAN (Address Sanitizer)](#using-google-asan-address-sanitizer)
-    + [Debugging](#debugging)
-    + [Comparing Google ASAN with Valgrind](#comparing-google-asan-with-valgrind)
-  * [Testing and Debugging Datarace Errors](#testing-and-debugging-datarace-errors)
-    + [Using Google TSAN (Thread Sanitizer)](#using-google-tsan-thread-sanitizer)
-    + [Debugging](#debugging-1)
+  * [Prerequisite: The Sanitizer Example](#prerequisite-the-sanitizer-example)
+  * [Building](#building)
+  * [binary_tree.c: Debugging Memory Errors with ASAN](#binary_treec-debugging-memory-errors-with-asan)
+    + [What the Program Does](#what-the-program-does)
+    + [Observing the Nondeterminism](#observing-the-nondeterminism)
+    + [Using ASAN to Detect the Heap Buffer Overflow](#using-asan-to-detect-the-heap-buffer-overflow)
+    + [Debugging binary_tree.c](#debugging-binary_treec)
+  * [sorted_list.c: Debugging Threading Errors with TSAN](#sorted_listc-debugging-threading-errors-with-tsan)
+    + [What the Program Does](#what-the-program-does-1)
+    + [Observing the Nondeterminism](#observing-the-nondeterminism-1)
+    + [Using TSAN to Detect the Threading Errors](#using-tsan-to-detect-the-threading-errors)
+    + [Not Every Concurrency Bug is a Data Race](#not-every-concurrency-bug-is-a-data-race)
+    + [Debugging sorted_list.c](#debugging-sorted_listc)
   * [Submission](#submission)
   * [Resources](#resources)
 
 # CS 1632 - Software Quality Assurance
-Spring Semester 2026 - Supplementary Exercise 3
+Fall Semester 2026 - Supplementary Exercise 3
 
-DUE: March 24 (Tuesday), 2026 before start of class
+DUE: TBD
 
 **GitHub Classroom Link:** TBD
 
 ## Description
 
-This set of code demonstrates concepts we learned in the Software QA and
-Nondeterminism lecture.  By trying out these programs, you will learn the following:
+In this exercise, you will apply ASAN (Google Address Sanitizer) and TSAN
+(Google Thread Sanitizer) to two buggy C programs.  By the end, you will have:
 
-1. Observe how values of pointers in C are randomized through ASLR leading to nondeterministic program behavior.
+1. Used ASAN to find a heap buffer overflow, and seen how ASAN can miss the
+   error (a false negative) until the input is large enough.
 
-1. Observe how pointer values can leak out to program output through memory errors.
+1. Used ASAN's built-in leak detector to find memory leaks.
 
-1. Learn how to turn ASLR off to make C pointers deterministic.
+1. Used TSAN on a concurrent data structure with fine-grained locking, and
+   learned to read TSAN reports for data races, heap-use-after-free, and
+   misuse of mutexes.
 
-1. Learn how to use ASAN (Google Address Sanitizer) to debug stack overflow memory errors.
+1. Seen that some concurrency bugs are not data races, and that TSAN cannot
+   detect them.
 
-1. Learn how to use ASAN (Google Address Sanitizer) to debug dangling pointer memory errors.
+## Prerequisite: The Sanitizer Example
 
-1. Observe how dataraces in C leads to nondeterministic program behavior.
+This exercise builds directly on the example in sample_code/sanitizer_example/
+in the course repository.
+If you have not done so already, please go through its README.md first.  It
+covers everything this README assumes you know:
 
-1. Learn how to use TSAN (Google Thread Sanitizer) to debug datarace errors.
+* How to launch a GitHub Codespace and open it in VSCode Desktop.
+* How ASLR randomizes addresses, and how to turn it off using `setarch`.
+* How memory errors leak randomized addresses into program output.
+* How to build with `-fsanitize=address` and read ASAN reports, including
+  why ASAN cannot catch overflows that stay within a single allocation.
+* How to build with `-fsanitize=thread` and read TSAN reports.
+* Why TSAN binaries must be run **with ASLR off** in our Codespace.
 
-1. Compare ASAN with Valgrind, another memory error detection tool.
+The rest of this README goes straight to the two programs you need to fix.
 
-## Setting up Build Environment
+## Building
 
-In order to use ASAN or TSAN, you need to clang version >= 3.1 or gcc version >= 4.8.
-Since you are unlikely to have either installed on your local
-computer, I am going to ask you to use Codespaces, a containerized development environment provided by GitHub.
-
-### Building
-
-In order to launch the codespace, you only need to click on the big green "Code" button on your GitHub.com page for your repository, and then select the "Codespaces" tab, after which you can click on "Create codespace on main" button.  Refer to the picture in the below link:
-
-https://docs.github.com/en/codespaces/developing-in-a-codespace/creating-a-codespace-for-a-repository#creating-a-codespace-for-a-repository
-
-That will launch a new tab on your web browser showing a VSCode-like development environment.  I will initially launch a script to install gdb and valgrind.  You can leave that running on the background while working on a bash shell on the Terminal.
-
-On the bash shell, invoke 'make':
-
-   ```
-   $ make
-   gcc -c -g -w heap.c -o heap.o
-   gcc heap.o -lm -o heap.bin
-   gcc -c -g -w stack.c -o stack.o
-   gcc stack.o -lm -o stack.bin
-   gcc -c -g -w stack_overflow.c -o stack_overflow.o
-   gcc stack_overflow.o -lm -o stack_overflow.bin
-   gcc -c -g -w stack_pointer_return.c -o stack_pointer_return.o
-   gcc stack_pointer_return.o -lm -o stack_pointer_return.bin
-   gcc -c -g -w heap_overflow.c -o heap_overflow.o
-   gcc heap_overflow.o -lm -o heap_overflow.bin
-   gcc -c -g -w binary_tree.c -o binary_tree.o
-   gcc binary_tree.o -lm -o binary_tree.bin
-   gcc -c -g -w -pthread datarace.c -o datarace.o
-   gcc datarace.o -lm -pthread -o datarace.bin
-   gcc -c -g -w -fsanitize=address stack_overflow.c -o stack_overflow.asan.o
-   gcc stack_overflow.asan.o -lm -fsanitize=address -o stack_overflow.asan
-   gcc -c -g -w -fsanitize=address stack_pointer_return.c -o stack_pointer_return.asan.o
-   gcc stack_pointer_return.asan.o -lm -fsanitize=address -o stack_pointer_return.asan
-   gcc -c -g -w -fsanitize=address heap_overflow.c -o heap_overflow.asan.o
-   gcc heap_overflow.asan.o -lm -fsanitize=address -o heap_overflow.asan
-   gcc -c -g -w -fsanitize=address binary_tree.c -o binary_tree.asan.o
-   gcc binary_tree.asan.o -lm -fsanitize=address -o binary_tree.asan
-   gcc -c -g -w -fPIE -fsanitize=thread -pthread datarace.c -o datarace.tsan.o
-   gcc datarace.tsan.o -lm -pie -fsanitize=thread -o datarace.tsan
-   ```
-
-Note how when I create ASAN instrumented binaries (e.g. stack_overflow.asan,
-stack_pointer_return.asan, ...), I pass the **-fsanitize=address** compiler option
-to gcc.  You need to pass it to both the compilation stage and the linking
-stage.
-
-Also note how when I create TSAN instrumented binaries (e.g. datarace.tsan)
-I pass the **-fsanitize=thread** compiler option
-to gcc.  I also pass the **-fPIE** and **-pie** options to the compilation and linking
-stages respectively.  This makes your code position independent, and is needed for
-TSAN to work flawlessly (I'm assuming you learned what PIE is in CS 449).
-
-### Editing Source Code on VSCode Desktop
-
-You can keep working on the Codespaces browser tab, or if you prefer a desktop
-environment, you can click on the hamburger icon on the top left (the icon with
-three horizontal bars), and then click on "Open in VS Code Desktop", which will
-launch your desktop VSCode and connect it to codespaces.
-
-## Testing and Debugging Memory Errors
-
-
-### Turning off ASLR (Address Space Layout Randomization)
-
-heap.c is a simple program that mallocs some bytes on the heap and prints out
-the pointer to that heap location.  You can use the VSCode IDE to open it.
-
-As we learned, even this simple program can display nondeterministic behavior
-due to ASLR.  Try it out yourself!
-
-```
-$ ./heap.bin
-p = 0x55de862c92a0
-$ ./heap.bin
-p = 0x56317e9b52a0
-$ ./heap.bin
-p = 0x5654dc8022a0
-```
-
-Your actual values will vary but you can see how the output is randomized.
-
-Likewise, stack.c is a simple program that prints out the pointer to a stack
-location.  And it also displays nondeterministic behavior due to ASLR:
-
-```
-$ ./stack.bin
-p = 0x7fff5e1060d0
-$ ./stack.bin
-p = 0x7fff4526e850
-$ ./stack.bin
-p = 0x7ffd5c507230
-```
-
-Now, let's try running both with ASLR turned off.  I've written a simple script
-named 'run_aslr_off.sh' that does exactly that:
-
-```
-$ bash run_aslr_off.sh ./heap.bin
-setarch x86_64 -R ./heap.bin
-p = 0x5555555592a0
-$ bash run_aslr_off.sh ./heap.bin
-setarch x86_64 -R ./heap.bin
-p = 0x5555555592a0
-$ bash run_aslr_off.sh ./heap.bin
-setarch x86_64 -R ./heap.bin
-p = 0x5555555592a0
-$ bash run_aslr_off.sh ./stack.bin
-setarch x86_64 -R ./stack.bin
-p = 0x7fffffffe3e0
-$ bash run_aslr_off.sh ./stack.bin
-setarch x86_64 -R ./stack.bin
-p = 0x7fffffffe3e0
-$ bash run_aslr_off.sh ./stack.bin
-setarch x86_64 -R ./stack.bin
-p = 0x7fffffffe3e0
-```
-
-Note that now the output is no longer random!  This is what it says if you 'man
-setarch':
-
-```
-$ man setarch
-...
- -R, --addr-no-randomize
-              Disables randomization of the virtual address space (turns on ADDR_NO_RANDOMIZE).
-...
-```
-
-Did you ever get the feeling that your C program that used to behave randomly
-suddenly becomes deterministic when you run it on top of GDB (GNU Debugger)?
-That is because GDB by default turns off ASLR for debugging purposes so that
-behavior is reproducible.  Turning off ASLR can be very useful in a debug
-setting.  Let's confirm with our own eyes that GDB does in fact turn off
-ASLR by running it three times:
-
-```
-$ gdb stack.bin
-...
-Reading symbols from stack.bin...
-(gdb) run
-Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
-p = 0x7fffffffe580
-[Inferior 1 (process 3981010) exited normally]
-(gdb) run
-Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
-p = 0x7fffffffe580
-[Inferior 1 (process 3981014) exited normally]
-(gdb) run
-Starting program: /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack.bin
-p = 0x7fffffffe580
-[Inferior 1 (process 3981202) exited normally]
-(gdb)
-```
-
-If you want to probe deeper, "personality" is the system call used in both
-"setarch" and "gdb" that turns off ASLR.  A brief look at 'man personality'
-shows:
-
-```
-$ man personality
-...
-SYNOPSIS
-       #include <sys/personality.h>
-
-       int personality(unsigned long persona);
-
-DESCRIPTION
-...
-       The flag values are as follows:
-...
-       ADDR_NO_RANDOMIZE (since Linux 2.6.12)
-              With this flag set, disable address-space-layout randomization.
-...
-```
-
-You can see through the "strace" Linux system call trace utility that
-"personality" is called with the "ADDR_NO_RANDOMIZE" argument both when
-stack.bin is invoked on top of "setarch -R" or on top of "gdb":
-
-```
-$ strace setarch -R ./stack.bin 2>&1 |grep personality
-personality(PER_LINUX|ADDR_NO_RANDOMIZE) = 0 (PER_LINUX)
-```
-
-```
-$ strace gdb -ex=r -ex=q stack.bin 2>&1 |grep personality
-personality(0xffffffff)                 = 0 (PER_LINUX)
-personality(PER_LINUX|ADDR_NO_RANDOMIZE) = 0 (PER_LINUX)
-personality(0xffffffff)                 = 0x40000 (PER_LINUX|ADDR_NO_RANDOMIZE)
-personality(PER_LINUX)                  = 0x40000 (PER_LINUX|ADDR_NO_RANDOMIZE)
-```
-
-### Using Google ASAN (Address Sanitizer)
-
-1. stack_overflow.c is a buggy program that demonstrates the stack buffer overflow
-issue that we discussed in the lecture.  In the main function, it starts by
-creating a linked list of 3 nodes on the stack.  Then, it sends 32 bytes of
-first.data to the screen:
-
-   ```
-   send_data(first.data, 32);
-   ```
-
-   First, let's try executing the program a few times as before:
-
-   ```
-   $ ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 c0 60 fb 80 fe 7f  0  0 57 6f 72 6c 64 2e 2e  0 d0 60 fb 80 fe 7f  0  0
-   $ ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 f0 4f 4c bf ff 7f  0  0 57 6f 72 6c 64 2e 2e  0  0 50 4c bf ff 7f  0  0
-   $ ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 e0 87 7e  f fc 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 87 7e  f fc 7f  0  0
-   ```
-
-   You can see that this is also a nondeterministic program.  But we only
-sent data to the output and no addresses this time, so where did the
-nondeterminism come from?  If you look more closely, you will notice that
-the first 8 bytes do not change from run to run.  If you know ASCII code,
-you will be able to decypher it to he the "Hello.." string (with nul
-terminator) inside first.data.  Then, what are the second 8 bytes that keep
-on changing?  For that, let's try running stack_overflow in verbose mode
-using the "-v" option:
-
-   ```
-   $ ./stack_overflow.bin -v
-   [Stack Frame]
-   return address = 0x7f2cf873d0b3
-   old base pointer = (nil) <--- base pointer
-   padding (8 bytes)
-   padding (8 bytes)
-   third.next = (nil)
-   third.data = .......
-   second.next = 0x7fffeca47e60 <--- Sent!
-   second.data = World.. <--- Sent!
-   first.next = 0x7fffeca47e50 <--- Sent!
-   first.data = Hello.. <--- Sent!
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 50 7e a4 ec ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 60 7e a4 ec ff 7f  0  0
-   ```
-
-   You will notice that the second 8 bytes is the pointer address inside
-first.next (in reverse, since x86 architecture uses little endian ordering)!
-So why is first.next being sent along with first.data?  That is because the
-first.data buffer is only 8 bytes long, so when send_data attempts to send
-32 bytes, it also sends the 8 bytes that come after first.data, which in the
-stack layout happens to be first.next.
-
-   In short, the address inside first.next **leaks out** to program output
-even though the programmer never intended it in the source code.  And this
-address randomized by ASLR is what is causing the nondeterminism.  Of
-course, you could again turn off ASLR to make the buggy program run
-deterministically, at least while debugging:
-
-   ```
-   $ bash run_aslr_off.sh ./stack_overflow.bin
-   setarch x86_64 -R ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
-   $ bash run_aslr_off.sh ./stack_overflow.bin
-   setarch x86_64 -R ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
-   $ bash run_aslr_off.sh ./stack_overflow.bin
-   setarch x86_64 -R ./stack_overflow.bin
-   [Sent data]
-   48 65 6c 6c 6f 2e 2e  0 e0 e5 ff ff ff 7f  0  0 57 6f 72 6c 64 2e 2e  0 f0 e5 ff ff ff 7f  0  0
-   ```
-
-   Note that the memory error still exists, but the program is going to be
-easier to debug since at least you can reproduce the same behavior every
-time you run the program.
-
-   But when the time comes to deploy your program, your end users will most
-likely have ASLR turned on in their machines for security.  What then?  Your
-programs will again be nondeterministic, and even if the program ran
-correctly when debugging with ASLR turned off, there is no guarantee that
-the correct behavior will be reproduced with ASLR turned back on.  So we may
-still get surprise defects.
-
-   How can we have a deterministic program when all addresses are randomized?
-Easy: just don't let addresses leak out to program output!  As we discussed,
-unless for debugging purposes, programs will almost never intentionally
-output addresses where data is stored --- they will typically output the
-data.  It is just that addresses leak out to output due to memory errors
-(like in this case).  So if we can catch all memory errors, then problem
-solved!  ASAN is exactly the kind of tool that can help you do that.
-
-   Now let's see if ASAN can find the bug for us by running the instrumented binary:
-
-   ```
-   $ ./stack_overflow.asan
-   [Sent data]
-   =================================================================
-   ==3982981==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x7ffc5e8d3330 at pc 0x56480b55c353 bp 0x7ffc5e8d32b0 sp 0x7ffc5e8d32a0
-   READ of size 1 at 0x7ffc5e8d3330 thread T0
-       #0 0x56480b55c352 in send_data /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:17
-       #1 0x56480b55c8a3 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:49
-       #2 0x7f429c3fb0b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x240b2)
-       #3 0x56480b55c22d in _start (/afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.asan+0x222d)
-
-   Address 0x7ffc5e8d3330 is located in stack of thread T0 at offset 48 in frame
-       #0 0x56480b55c394 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_overflow.c:22
-
-     This frame has 3 object(s):
-       [32, 48) 'first' (line 23) <== Memory access at offset 48 overflows this variable
-       [64, 80) 'second' (line 23)
-       [96, 112) 'third' (line 23)
-   ...
-   ```
-
-   ASAN is able to pinpoint exactly where the illegal "READ of size 1"
-happened at stack_overflow.c:17!  That is where the out of bounds array
-access happens.  Below that line is the stack trace so we know the calling
-context.
-
-1. stack_pointer_return.c is another buggy program with a common memory error
-where a function returns a pointer to a local array.  When the function
-returns, the local array is deallocated with the rest of the function frame
-as it is now out of scope, thereby leaving the pointer dangling.  Similar to
-the stack overflow memory error, accessing dangling pointers results in
-**undefined behavior** according to the C language specifications.  The
-particular version of GCC installed on the machine (GCC 9.3.0) chose to set
-this dangling pointer to a null pointer before returning from the function
-bar() rather than leaving it dangling (which is a good choice).  So, you get
-deterministic behavior in this case --- it's just that accessing a null
-pointer results in a segmentation fault:
-
-
-   ```
-   $ ./stack_pointer_return.bin
-   Segmentation fault (core dumped)
-   ```
-
-   Old versions of GCC and some other compilers would just leave the pointer
-dangling which would cause an access of a dangling pointer.  So what happens
-then?  Well, the pointer is dangling because the memory that it used to
-point to is deallocated.  That piece of memory eventually gets reallocated
-to hold other values (in this case, when a new stack frame is allocated).
-If that value is an address, you would get nondeterministic behavior.
-
-   In any case, it is a memory error that needs to be fixed!  So let's see if
-ASAN can help us this time as well:
-
-   ```
-   $ ./stack_pointer_return.asan
-   [Sent data]
-   AddressSanitizer:DEADLYSIGNAL
-   =================================================================
-   ==3983404==ERROR: AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x55be4fe0f2f3 bp 0x7ffff2292920 sp 0x7ffff2292900 T0)
-   ==3983404==The signal is caused by a READ memory access.
-   ==3983404==Hint: address points to the zero page.
-       #0 0x55be4fe0f2f2 in send_data /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:8
-       #1 0x55be4fe0f454 in main /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:23
-       #2 0x7f6edbe040b2 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x240b2)
-       #3 0x55be4fe0f1cd in _start (/afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.asan+0x11cd)
-
-   AddressSanitizer can not provide additional info.
-   SUMMARY: AddressSanitizer: SEGV /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/stack_pointer_return.c:8 in send_data
-   ==3983404==ABORTING
-   ```
-
-   Again, stack_pointer_return.c:8 is flagged as an illegal read because it
-is attempting to read a location that has already been deallocated.  
-
-1. heap_overflow,c has a memory error on the heap.  It displays
-   nondeterministic behavior due to this error, just like before:
-
-   ```
-   $ ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@r}kU
-   Name check result = 0
-   $ ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@[rU
-   Name check result = 0
-   $ ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@TU
-   Name check result = 0
-   ```
-
-   Note the random string for tree-\>name.  Again we can temporarily disable
-ASLR to obtain deterministic behavior:
-
-   ```
-   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
-   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@WUUU
-   Name check result = 0
-   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
-   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@WUUU
-   Name check result = 0
-   $ bash run_aslr_off.sh ./heap_overflow.bin 10 helloworld
-   setarch x86_64 -R ./heap_overflow.bin 10 helloworld
-   Failure: name=helloworld, tree->name=hellowor@WUUU
-   Name check result = 0
-   ```
-
-   But again, to fundamentally solve the issue, we need to get rid of the
-memory error to begin with.  Let's use ASAN for the purpose.
-
-   ```
-   $ ./heap_overflow.asan 10 helloworld
-   Failure: name=helloworld, tree->name=helloworp
-   Name check result = 0
-   ```
-
-   Wait, why didn't ASAN detect the error?  Hmmm.  Let's try a longer string
-this time:
-
-   ```
-   $ ./heap_overflow.asan 10 Astringlongerthan24bytes
-   =================================================================
-   ==2678929==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x603000000058 at pc 0x7f550731e4bf bp 0x7fff895b4920 sp 0x7fff895b40c8
-   WRITE of size 25 at 0x603000000058 thread T0
-       #0 0x7f550731e4be in __interceptor_strcpy ../../../../src/libsanitizer/asan/asan_interceptors.cpp:440
-       #1 0x55e6766a72e1 in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:32
-    #2 0x55e6766a74e7 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
-   ...
-   0x603000000058 is located 0 bytes to the right of 24-byte region [0x603000000040,0x603000000058)
-   allocated by thread T0 here:
-       #0 0x7f550737e867 in __interceptor_malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:145
-       #1 0x55e6766a72ca in NewTreeNode /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:30
-       #2 0x55e6766a74e7 in BottomUpTree /afs/pitt.edu/home/w/a/wahn/teaching/cs1632/CS1632_Sanitizer/heap_overflow.c:67
-   ...
-   ```
-
-   Success!  There was a write of 25 bytes to location 0x603000000028 at
-heap_overflow.c:32.  And that location 0x603000000028 was allocated as a
-24-byte region at heap_overflow.c:30.  That 24-byte region would be the
-treeNode struct that was allocated at that line.  The treeNode is 24 bytes
-because it consists of two pointers, 8 bytes each, and a char array of 4
-bytes which is padded to 8 bytes for alignment.
-
-   That shines a light into the mystery of why the original string
-"helloworld" did not trigger detection by ASAN.  ASAN maintains a "shadow
-memory" of allocated memory regions and the string needed to be long enough
-to overflow the region for detection to happen.  This is a limitation in
-ASAN.  There is obviously an error even with the shorter "helloworld"
-string --- it is just that ASAN was not able to detect it --- a false
-negative.  But if you think about it, you can understand why it is so hard
-for ASAN to detect an illegal offset access within an allocation region.
-Even when the strcpy write overflows from new-\>name into new-\>left, that
-is technically a legal access in the C programming language.  The access
-still happens within the bounds of allocated memory, so according to C
-specifications, the behavior is well-defined and it is technically not a
-memory error!  
-
-   Once you understand this aspect of ASAN, you will understand that sometimes
-you need to longer strings to turn overflows into true memory errors and
-allow detection.
-
-
-### Debugging
-
-Modify stack_overflow.c, stack_pointer_return.c, and heap_overflow.c so that
-they no longer contain memory errors.  
-
-Once you are done, invoke 'make' again to recompile the binaries:
+Launch a Codespace on your repository the same way you did for the example,
+and invoke `make` on the Terminal:
 
 ```
 $ make
-gcc -c -g -w stack_overflow.c -o stack_overflow.o
-gcc stack_overflow.o -lm -o stack_overflow.bin
-gcc -c -g -w -fsanitize=address stack_overflow.c -o stack_overflow.asan.o
-gcc stack_overflow.asan.o -lm -fsanitize=address -o stack_overflow.asan
-...
+mkdir -p bin
+gcc -g -w -std=gnu99 -pthread binary_tree.c -lm -o bin/binary_tree.bin
+gcc -g -w -std=gnu99 -pthread sorted_list.c -lm -o bin/sorted_list.bin
+gcc -g -w -std=gnu99 -pthread -fsanitize=address binary_tree.c -lm -o bin/binary_tree.asan
+gcc -g -w -std=gnu99 -pthread -fPIE -pie -fsanitize=thread sorted_list.c -lm -o bin/sorted_list.tsan
 ```
 
-Now, you should now see the data properly sent to the output in both cases:
+All binaries are written to the `bin/` directory.  `binary_tree.c` gets a plain
+build and an ASAN build.  `sorted_list.c` gets a plain build and a TSAN build.
 
+## binary_tree.c: Debugging Memory Errors with ASAN
 
-```
-$ ./stack_overflow.asan 
-[Sent data]
-48 65 6c 6c 6f 2e 2e  0
-```
+### What the Program Does
 
-```
-$ ./stack_pointer_return.asan
-[Sent data]
- 1  2  3  4  5  6  7  8 
-```
+binary_tree.c is a modified version of the binary tree benchmark you timed in
+the example.  It takes a single argument, a name:
 
 ```
-$ ./heap_overflow.asan 10 Astringlongerthan24bytes
+$ ./bin/binary_tree.bin <name>
+```
+
+It builds a complete binary tree of depth TREE_DEPTH (10) where every node
+stores a copy of the name.  Then NameCheck walks the tree and verifies that every node
+still holds the name that was copied into it.  If all nodes match, it prints
+`Name check result = 1`.
+
+### Observing the Nondeterminism
+
+With a short name, everything works:
+
+```
+$ ./bin/binary_tree.bin abc
 Name check result = 1
 ```
 
-Since there are no memory errors, the ASAN instrumentation should not output
-any errors.
-
-If you are stuck debugging the programs, here are some hints:
-
-1. stack_overflow.c contains a stack overflow, so the solution is to reduce the
-   number of bytes to fit within the provided buffer.
-1. stack_pointer_return.c is attempting to return a pointer to a stack
-   location.  One way to fix it is to declare the array to be a static local
-variable so that it gets moved from the stack to static memory which has
-persistent duration.  
-1. heap_overflow.c currently has a statically sized char array for name.  To
-   allow arbitrarily long names, consider using strdup instead of strcpy.
-
-### Comparing Google ASAN with Valgrind
-
-You may have used a runtime memory error checking tool called Valgrind in CS
-449: Introduction to System Software or somewhere else.  In terms of purpose,
-ASAN and Valgrind share common goals.  However, ASAN is superior to Valgrind in
-some ways.  That is because ASAN performs instrumentation at the source code
-level whereas Valgrind performs instrumentation at the binary level.  A lot of
-the semantic information that was present at the source code level is removed
-at the binary level, meaning Valgrind instrumentation cannot be as detailed and
-as efficient as ASAN instrumentation.  
-
-For one thing, ASAN is much faster than Valgrind.  Since the source code
-provides much more semantic information, ASAN can make a much better decision
-on where instrumentation is needed.  Also, the instrumentation gets optimized
-along with other code using compiler optimizations.  'binary_tree.c' is a
-benchmark in the [Language Shootout Benchmark
-Suite](https://benchmarksgame-team.pages.debian.net/benchmarksgame/index.html).
-Let's time 'binary_tree.c' a) running without instrumentation, b) running with
-ASAN instrumentation, and c) running with Valgrind instrumentation:
-
-   ```
-   $ time ./binary_tree.bin 10
-   ...
-   real    0m0.012s
-   user    0m0.012s
-   sys     0m0.000s
-
-   $ time ./binary_tree.asan 10
-   ...
-   real    0m0.174s
-   user    0m0.145s
-   sys     0m0.029s
-
-   $ time valgrind ./binary_tree.bin 10
-   ...
-   real    0m1.831s
-   user    0m1.723s
-   sys     0m0.108s
-   ```
-
-   'time' is a Linux utility used to time an application.  The last three rows
-starting with 'real', 'user', and 'sys' is output from the 'time' utility and
-not from the application.  We are going to learn more about it when we talk
-about Performance Testing, but for now, all you need to know is that 'real'
-measures real time (as in actual wall clock time to run an application).  As
-you can see, ASAN results in an approximately 14.5X slowdown whereas Valgrind
-results in an approximately 152.6X slowdown!
-
-So, is Valgrind obsolete?  No, Valgrind does have one strong point: that it can
-instrument binaries without the need of source code and without the need of
-recompilation.  But if you do have the source code (which is typically the case
-for tested software), most people would prefer ASAN over Valgrind.
-
-## Testing and Debugging Datarace Errors
-
-### Using Google TSAN (Thread Sanitizer)
-
-datarace.c is a buggy program with a datarace on the variable 'shared'.  Hence,
-everytime you run the program you will get nondeterministic output:
+But try a longer name:
 
 ```
-$ ./datarace.bin
-shared=1024461
-$ ./datarace.bin
-shared=1041862
-$ ./datarace.bin
-shared=1021775
+$ ./bin/binary_tree.bin helloworld
+Failure: name=helloworld, tree->name=hellowor@????U
+Name check result = 0
+$ ./bin/binary_tree.bin helloworld
+Failure: name=helloworld, tree->name=hellowor@????V
+Name check result = 0
+$ ./bin/binary_tree.bin helloworld
+Failure: name=helloworld, tree->name=hellowor@????V
+Name check result = 0
 ```
 
-Now let's try using TSAN to discover this bug by running the instrumented
-datarace.tsan binary.  Note that we need to run TSAN with ASLR off, which is in
-theory not necessary, but is necessary in this case because of compatibility
-with how Ubuntu 24.04 (the linux version for our current devcontainer) does
-ASLR with an entropy of 32 bits (vm.mmap_rnd_bits=32).  Don't worry if that
-does not make sense to you --- just make sure you run TSAN with ALSR off.
+The name check fails, and the garbage characters after "hellowor" are
+different every run.  As you learned in the example, this smells like a
+randomized address leaking into program output.  Indeed, when you turn off
+ASLR, the garbage becomes the same every run.  To run a program with ASLR off,
+launch it through `setarch x86_64 -R`, as you saw in the example (`x86_64` is
+the architecture of the Codespace machine, which is what `uname -m` prints, and
+`-R` disables address space randomization for the launched program):
 
 ```
-$ bash run_aslr_off.sh ./datarace.tsan
-==================
-WARNING: ThreadSanitizer: data race (pid=2438881)
-  Write of size 4 at 0x55eb33b6f014 by thread T1:
-    #0 add /home/PITT/wahn/nondeterminism/C/datarace.c:8 (datarace.tsan+0x12af)
-
-  Previous read of size 4 at 0x55eb33b6f014 by main thread:
-    #0 add /home/PITT/wahn/nondeterminism/C/datarace.c:8 (datarace.tsan+0x129a)
-    #1 main /home/PITT/wahn/nondeterminism/C/datarace.c:18 (datarace.tsan+0x1325)
-
-  Location is global 'shared' of size 4 at 0x55eb33b6f014 (datarace.tsan+0x000000004014)
-
-  Thread T1 (tid=2438883, running) created by main thread at:
-    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:962 (libtsan.so.0+0x5ea79)
-    #1 main /home/PITT/wahn/nondeterminism/C/datarace.c:16 (datarace.tsan+0x131b)
-
-SUMMARY: ThreadSanitizer: data race /home/PITT/wahn/nondeterminism/C/datarace.c:8 in add
-==================
-shared=1000000
-ThreadSanitizer: reported 1 warnings
+$ setarch x86_64 -R ./bin/binary_tree.bin helloworld
+Failure: name=helloworld, tree->name=hellowor@?VUUU
+Name check result = 0
+$ setarch x86_64 -R ./bin/binary_tree.bin helloworld
+Failure: name=helloworld, tree->name=hellowor@?VUUU
+Name check result = 0
 ```
 
-It tells you exactly what each thread was doing to cause the datarace.  The
-"main thread" was executing add in line datarace.c:8 and "thread T1" (the
-child thread) was likewise executing add at the same source line.  That is
-exactly where the unprotected 'shared++' is happening.
+(Unprintable characters are shown as '?' above.)  Your garbage characters will
+look different from the above, but they should be consistent from run to run
+with ASLR off.
 
-### Debugging
+Take a look at the treeNode struct and NewTreeNode in binary_tree.c and think
+about where the bytes after "hellowor" come from.  (Hint: x86-64 is little
+endian, and user-space addresses with ASLR off typically start with
+0x5555....  What is 'U' in ASCII?)
 
-Modify datarace.c so that it no longer contains datarace errors.  Edit and
-compile using 'make' as before.  After debugging, you should now see the
-shared variable incremented 2000000 times every time you run it:
+### Using ASAN to Detect the Heap Buffer Overflow
+
+Let's see if ASAN can find the bug:
 
 ```
-$ ./datarace.bin
-shared=2000000
+$ ./bin/binary_tree.asan helloworld
+Failure: name=helloworld, tree->name=hellowor???
+Name check result = 0
 ```
 
-Hint: you will have to use the pthreads mutex API to acquire and relase the
-lock while the update to the shared variable is happening.  Use the
-pthread_mutex_init, pthread_mutex_lock, and pthread_mutex_unlock APIs you
-learned in CS 449.  If you need a reminder, here is the pthread_mutex_init manpage:
-https://linux.die.net/man/3/pthread_mutex_init
+No ASAN error, even though the name check clearly failed.  This is the same
+limitation you saw with stack_overflow.c in the example: the overflow stays
+within the bounds of the malloc'ed treeNode, so as far as the C language is
+concerned, nothing illegal happened.  For ASAN to see the error, the write has
+to cross the end of the allocation.  Let's try a name that is longer than the
+entire treeNode:
 
-There is some example code at the bottom of the manpage.  For your uses, using
-the PTHREAD_MUTEX_INITIALIZER initializer should suffice.
+```
+$ ./bin/binary_tree.asan Astringlongerthan24bytes
+=================================================================
+==186==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x503000000058 at pc 0x7f5215ea7923 bp 0x7fffd0c54b90 sp 0x7fffd0c54338
+WRITE of size 25 at 0x503000000058 thread T0
+    #0 0x7f5215ea7922 in strcpy ../../../../src/libsanitizer/asan/asan_interceptors.cpp:563
+    #1 0x56440d3d12e1 in NewTreeNode /workspaces/.../binary_tree.c:47
+    #2 0x56440d3d14e7 in BottomUpTree /workspaces/.../binary_tree.c:99
+    #3 0x56440d3d14a3 in BottomUpTree /workspaces/.../binary_tree.c:92
+    ...
+    #13 0x56440d3d160e in main /workspaces/.../binary_tree.c:141
+    ...
+
+0x503000000058 is located 0 bytes after 24-byte region [0x503000000040,0x503000000058)
+allocated by thread T0 here:
+    #0 0x7f5215efd9c7 in malloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:69
+    #1 0x56440d3d12ca in NewTreeNode /workspaces/.../binary_tree.c:45
+    #2 0x56440d3d14e7 in BottomUpTree /workspaces/.../binary_tree.c:99
+    ...
+```
+
+Now ASAN catches it: a write of 25 bytes (the 24-character string plus the nul
+terminator) at binary_tree.c:47, overflowing a 24-byte region allocated at
+binary_tree.c:45.
+
+By the way, out of curiosity, what happens if you run the uninstrumented binary
+with the same long string?
+
+```
+$ ./bin/binary_tree.bin Astringlongerthan24bytes
+Fatal glibc error: malloc.c:2599 (sysmalloc): assertion failed: ...
+Aborted
+```
+
+The overflow has now gone past the treeNode and trampled the bookkeeping data
+that malloc keeps next to each allocation, so the crash happens later, inside
+malloc, far away from the line that caused it.  Without ASAN, you would be
+left staring at a crash in malloc wondering what went wrong.
+
+### Debugging binary_tree.c
+
+Modify binary_tree.c so that it works correctly for names of any length.  The
+simplest approach is to change `name` into a `char*` and use `strdup` instead
+of `strcpy`.  After making the change, recompile with `make` and try ASAN
+again:
+
+```
+$ ./bin/binary_tree.asan Astringlongerthan24bytes
+Name check result = 1
+
+=================================================================
+==204==ERROR: LeakSanitizer: detected memory leaks
+
+Direct leak of 25 byte(s) in 1 object(s) allocated from:
+    #0 0x7f07d10f74e8 in strdup ../../../../src/libsanitizer/asan/asan_interceptors.cpp:578
+    #1 0x5637f411f2da in NewTreeNode /workspaces/.../binary_tree.c:47
+    ...
+```
+
+The overflow is gone, but ASAN now reports memory leaks!  ASAN includes a leak
+detector (LeakSanitizer) that runs when the program exits and reports every
+heap allocation that was never freed, along with where it was allocated.  In
+this case, it points to the strdup at binary_tree.c:47.  Find out where that
+memory should be freed and fix the leak too.
+
+When you are done, ASAN should report no errors at all:
+
+```
+$ ./bin/binary_tree.asan Astringlongerthan24bytes
+Name check result = 1
+$ ./bin/binary_tree.asan helloworld
+Name check result = 1
+$ ./bin/binary_tree.asan abc
+Name check result = 1
+```
+
+## sorted_list.c: Debugging Threading Errors with TSAN
+
+### What the Program Does
+
+sorted_list.c implements a **set** of integers as a sorted singly linked list
+that multiple threads can modify at the same time.  It is a lot more involved
+than datarace.c in the example, so read the source code (and its comments)
+carefully before you start.
+
+* The list always starts with a head sentinel node (key INT_MIN) and ends with
+  a tail sentinel node (key INT_MAX), so every real key has a node before it
+  and a node after it.
+* Instead of one lock for the entire list, **every node has its own lock**.
+  This is called fine-grained locking, and it allows threads working on
+  different parts of the list to proceed in parallel.
+* `Find` walks the list from the head using **hand-over-hand locking** (also
+  called lock coupling), like a person crossing monkey bars.  It returns the
+  two adjacent nodes `pred` and `curr` between which the key belongs, with both
+  of them locked.
+* `Remove` and `AddIfAbsent` call `Find`, modify the list while holding the
+  locks on `pred` and `curr`, and update the `size` field of the list.
+* `main` starts NUM_THREADS (2) worker threads.  Each worker performs the given
+  number of operations, each of which picks a random key in [0, 100) and
+  either adds it to the set (if absent) or removes it.  Each worker counts its
+  successful adds and removes.
+
+After all workers finish, main walks the list and performs three checks:
+
+1. **Size check**: the `size` field equals the number of nodes actually in the
+   list.
+1. **Accounting check**: the number of nodes in the list equals total
+   successful adds minus total successful removes.
+1. **Order check**: the keys are in strictly ascending order (so, in
+   particular, there are no duplicates).
+
+### Observing the Nondeterminism
+
+Try running the plain binary a few times:
+
+```
+$ ./bin/sorted_list.bin 10000
+Segmentation fault
+$ ./bin/sorted_list.bin 10000
+Nodes in list = 50, size field = 51, adds - removes = 51
+Size check result = 0
+Accounting check result = 0
+Order check result = 1
+$ ./bin/sorted_list.bin 10000
+sorted_list.bin: sorted_list.c:179: AddIfAbsent: Assertion `curr->key != key' failed.
+Aborted
+```
+
+Three runs, three different outcomes: a crash, a corrupted list, and a failed
+assertion.  Your results will vary, and you may need to run it several times
+or with more operations (e.g. 100000) to see each kind of failure.  With very
+few operations (e.g. 10) the program may even appear to work, because the two
+threads rarely get in each other's way.  This is exactly why concurrency bugs
+are so hard to test for.
+
+### Using TSAN to Detect the Threading Errors
+
+Now run the TSAN binary.  Remember to turn ASLR off, as explained in the
+example:
+
+```
+$ setarch x86_64 -R ./bin/sorted_list.tsan 1000
+```
+
+You will get a long stream of reports, and it will be different every time.
+To get an overview, it helps to filter just the SUMMARY lines:
+
+```
+$ setarch x86_64 -R ./bin/sorted_list.tsan 1000 2>&1 | grep -E "SUMMARY|check result"
+SUMMARY: ThreadSanitizer: use of an invalid mutex (e.g. uninitialized or destroyed) /workspaces/.../sorted_list.c:121 in Find
+SUMMARY: ThreadSanitizer: data race /workspaces/.../sorted_list.c:123 in Find
+SUMMARY: ThreadSanitizer: data race /workspaces/.../sorted_list.c:119 in Find
+SUMMARY: ThreadSanitizer: data race /workspaces/.../sorted_list.c:125 in Find
+SUMMARY: ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread) /workspaces/.../sorted_list.c:150 in Remove
+SUMMARY: ThreadSanitizer: data race /workspaces/.../sorted_list.c:181 in AddIfAbsent
+Size check result = 1
+Accounting check result = 1
+Order check result = 1
+```
+
+Notice two things.  First, TSAN reports more than just data races: it also
+reports heap-use-after-free, use of a destroyed mutex, unlocking a mutex that
+is not locked, and so on.  Second, in this particular run, all three checks
+passed!  The program got lucky this time, but TSAN still caught the bugs.
+That is the value of a tool like TSAN: it detects a bug when the bug
+*could have* caused a failure, not only when it actually did.
+
+Many of these reports are symptoms of the same underlying bug, so don't try to
+fix them one at a time.  Instead, read a few full reports carefully and figure
+out the root causes.  Some reports will look strange at first.  For example,
+this is a common one:
+
+```
+WARNING: ThreadSanitizer: data race (pid=441)
+  Atomic read of size 1 at 0x721000002190 by thread T1:
+    #0 pthread_mutex_lock ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1341 (libtsan.so.2+0x59a13)
+    #1 Find /workspaces/.../sorted_list.c:121 (sorted_list.tsan+0x15e3)
+    #2 AddIfAbsent /workspaces/.../sorted_list.c:170 (sorted_list.tsan+0x1814)
+    #3 Worker /workspaces/.../sorted_list.c:207 (sorted_list.tsan+0x1a77)
+
+  Previous write of size 8 at 0x721000002190 by thread T2 (mutexes: write M0, write M1):
+    #0 malloc ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:665 (libtsan.so.2+0x54b3f)
+    #1 NewNode /workspaces/.../sorted_list.c:67 (sorted_list.tsan+0x1412)
+    #2 AddIfAbsent /workspaces/.../sorted_list.c:180 (sorted_list.tsan+0x1913)
+    #3 Worker /workspaces/.../sorted_list.c:207 (sorted_list.tsan+0x1a77)
+
+  Location is heap block of size 56 at 0x721000002180 allocated by thread T2:
+    #0 malloc ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:665 (libtsan.so.2+0x54b3f)
+    #1 NewNode /workspaces/.../sorted_list.c:67 (sorted_list.tsan+0x1412)
+    ...
+SUMMARY: ThreadSanitizer: data race /workspaces/.../sorted_list.c:121 in Find
+```
+
+Thread T1 is trying to lock a node's mutex in Find, and the "previous write" to
+that same memory was done by *malloc* in another thread.  Why would malloc be
+writing to memory that T1 thinks is a list node it is allowed to lock?  Think
+about what must have happened to that node's memory before malloc handed it
+out again.
+
+Also pay attention to the `(mutexes: ...)` annotations.  They list the locks
+each thread was holding at the time of the access.  If two threads were both
+holding locks but the access is still flagged as a data race, ask yourself
+whether they were holding the *same* lock.
+
+### Not Every Concurrency Bug is a Data Race
+
+There are three bugs in sorted_list.c.  Two of them show up in TSAN reports.
+The third one is **not a data race**: every memory access involved is
+properly protected by a lock, so TSAN will never report it, no matter how
+many times you run it.
+
+You will know you have hit the third bug when TSAN goes quiet but the program
+still fails with:
+
+```
+sorted_list.tsan: sorted_list.c:179: AddIfAbsent: Assertion `curr->key != key' failed.
+```
+
+TSAN can only tell you whether two accesses to the same location are ordered
+by synchronization.  It has no way of knowing that a *sequence* of operations
+was supposed to happen as one indivisible (atomic) step.  That intention lives
+only in the programmer's head.  This is the threading counterpart to the ASAN
+limitation you saw in binary_tree.c and stack_overflow.c, where ASAN could
+not know the programmer's intention about field boundaries.  To find this kind
+of bug, you have to reason about the code, and assertions like the one above
+help you catch it during testing.
+
+### Debugging sorted_list.c
+
+Modify sorted_list.c to fix all three bugs.  Please keep the fine-grained
+per-node locking design: wrapping every operation in one big global lock would
+make the bugs go away, but it would also throw away the parallelism that the
+design is meant to provide.
+
+After recompiling with `make`, TSAN should report no warnings and all three
+checks should pass on every run:
+
+```
+$ setarch x86_64 -R ./bin/sorted_list.tsan 100000
+Nodes in list = 48, size field = 48, adds - removes = 48
+Size check result = 1
+Accounting check result = 1
+Order check result = 1
+$ setarch x86_64 -R ./bin/sorted_list.tsan 100000
+Nodes in list = 45, size field = 45, adds - removes = 45
+Size check result = 1
+Accounting check result = 1
+Order check result = 1
+```
+
+Note that the number of nodes in the list can still differ from run to run.
+That is not a bug: which keys end up in the set depends on how the two
+threads' operations happened to interleave.  What must hold on every run is
+that the three checks pass.  Also, since TSAN can only analyze the
+interleavings that actually happened, run it several times (and with a large
+number of operations) before you conclude that the bugs are gone.
+
+If you are stuck, here are some hints:
+
+1. **Find**: The rule of hand-over-hand locking is that you never let go of
+   one bar until you have grabbed the next one.  Look at the order of the
+   lock and unlock calls inside the loop.  What could another thread do to
+   `curr` in the gap between them?
+1. **size**: Which lock protects the `size` field?  Two threads operating on
+   different parts of the list hold different node locks, so neither of those
+   locks protects a field that both threads update.  You can protect `size`
+   with a dedicated mutex (`PTHREAD_MUTEX_INITIALIZER` works, as in the
+   example), or use an atomic increment/decrement such as GCC's
+   `__atomic_fetch_add`.
+1. **AddIfAbsent**: Between the moment AddIfAbsent decides the key is absent
+   and the moment it inserts the key, it holds no locks at all.  What could
+   another thread do during that window?  The check and the insertion need to
+   happen within a single critical section.
 
 ## Submission
 
@@ -684,7 +440,7 @@ repository such that you remove all generated binary files:
 make clean
 ```
 
-Once you do that, if you do 'git status' you should see only four modified
+Once you do that, if you do 'git status' you should see only two modified
 files:
 
 ```
@@ -695,10 +451,8 @@ Your branch is up to date with 'origin/main'.
 Changes not staged for commit:
   (use "git add <file>..." to update what will be committed)
   (use "git restore <file>..." to discard changes in working directory)
-	modified:   datarace.c
-	modified:   heap_overflow.c
-	modified:   stack_overflow.c
-	modified:   stack_pointer_return.c
+	modified:   binary_tree.c
+	modified:   sorted_list.c
 
 no changes added to commit (use "git add" and/or "git commit -a")
 ```
@@ -718,24 +472,29 @@ is to push the changes to the origin:
 git push
 ```
 
-Feel free to double check that your changes have to been reflected on to
-your GitHub Classroom origin repository.  Please submit that repository to
-the "Supplementary Exercise 1 GitHub" link.
+Feel free to double check that your changes have been reflected on to your
+GitHub Classroom origin repository.  Please submit that repository to the
+"Supplementary Exercise 3 GitHub" link.
 
 Again, don't forget to add your partner to each submission.  You can
-resubmit as many times as you with until you get a perfect score on the
+resubmit as many times as you wish until you get a perfect score on the
 autograder.
 
 ## Resources
 
-* Reproducible Builds Website: https://reproducible-builds.org/docs/
-* Windows SSH Terminal Client: [Putty](https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html)
-* File Transfer Client: [FileZilla](https://filezilla-project.org/download.php?type=client)
-* Linux command line tutorial: [The Linux Command Line](http://linuxcommand.org/lc3_learning_the_shell.php)
+Google Address Sanitizer (ASAN) Wiki:
+https://github.com/google/sanitizers/wiki/addresssanitizer
 
-Stack overflow, stack pointer return, and data race are also well know security
-vunerabilities documented by MITRE in the Common Weakness Enumeration (CWE).
+Google Thread Sanitizer (TSAN) Report Format Wiki:
+https://github.com/google/sanitizers/wiki/ThreadSanitizerReportFormat
 
-* CWE-121: Stack-based Buffer Overflow: https://cwe.mitre.org/data/definitions/121.html
-* CWE-562: Return of Stack Variable Address: https://cwe.mitre.org/data/definitions/562.html
+Google Thread Sanitizer (TSAN) About Races Wiki:
+https://github.com/google/sanitizers/wiki/ThreadSanitizerAboutRaces
+
+The bugs in this exercise are also well known security vulnerabilities
+documented by MITRE in the Common Weakness Enumeration (CWE).
+
+* CWE-122: Heap-based Buffer Overflow: https://cwe.mitre.org/data/definitions/122.html
+* CWE-401: Missing Release of Memory after Effective Lifetime: https://cwe.mitre.org/data/definitions/401.html
+* CWE-416: Use After Free: https://cwe.mitre.org/data/definitions/416.html
 * CWE-362: Concurrent Execution using Shared Resource with Improper Synchronization ('Race Condition'): https://cwe.mitre.org/data/definitions/362.html
